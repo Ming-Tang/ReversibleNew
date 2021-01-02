@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.html
+*.pdf
+.fake
+.ionide
+.vs
+ReversibleNew/bin
+ReversibleNew/obj

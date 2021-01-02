@@ -1,0 +1,319 @@
+---
+title: ''
+output:
+  html_document:
+    number_sections: true
+    toc: yes
+    toc-title: Table of Contents
+---
+
+# Introduction
+
+We introduce a form of reversible functional programming that is based on
+n-ary operators such that they does not require commutative/associative
+operations.
+
+# Computational model
+
+$$
+{\ }^{n\ \longleftrightarrow}_{1\ \longleftrightarrow}\fbox{ function }
+{\ }^{\longleftrightarrow\ n}_{\longleftrightarrow\ 1}
+$$
+
+A reversible function will be modeled as a black box with $n + 1$ input wires
+and $n + 1$ output wires, with each wire being binary, i.e. $0$ or $1$.
+
+The final wire at each side (indicated with $+ 1$) indicates when the input
+enters the box (on the input side) or when the output leaves the box (on the
+output side).
+
+To perform a computation, feed $n$ input wires (on either side) plus the final
+wire set to $1$ (powered up). When the final wire on another side is $1$ (
+powered up), the computation finishes and the $n$ output wires can be read.
+
+## Physical realizations
+
+Physical realizations of reversible computing can be:
+
+- Digital circuits
+- Mechanical circuits (billiard balls through tubes)
+- 2D cellular automaton
+
+# Type system
+
+$$\begin{aligned}
+Type ::=&\ \binom{n}{k} \\
+|&\ (Type + Type \ldots) \\
+|&\ (Type \oplus Type \ldots) \\
+|&\ (Type \otimes Type \ldots) \\
+\end{aligned}$$
+
+## Binomial type
+
+A bundle of $n$ wires with exactly $k$ wires powered up at same time is
+denoted with
+$$\binom{n}{k}, 0 \le k \le n$$
+
+Special case notations for the binomial types are:
+
+$$
+\binom{0}{0} = 0,\quad \binom{1}{1} = 1,\quad \binom{n}{1} = n,\ n \ne 1
+$$
+
+Binomial types cannot be simplified in ways that would change the number of
+wires, even if the number of possible values are preserved.
+i.e. $\binom{5}{3} \ne 10$ since the former contains 5 wires and the latter
+contains 10 wires or $\binom{10}{1}$.
+
+Instead, we use the **isomorphic** relationship $\binom{5}{3} \sim 10$.
+
+## Sum of binomial types
+
+The `+` operator denotes a sum of multiple **distinct** binomial types
+with the **same** number of wires. It is commutative and conventionally sorted.
+
+$$
+\sum_{i=1}^m \binom{n}{k_i} = \binom{n}{k_1} + \ldots + \binom{n}{k_m},\quad \text{each $k_i$ distinct}
+$$
+
+Example: $5$ wires with exactly $2$, $3$ or $4$ wires powered up at same time.
+
+$$
+\binom{5}{2} + \binom{5}{3} + \binom{5}{4}
+$$
+
+To represent a binary number with $n$ bits:
+
+$$
+2^n = \sum_{i=0}^{n} \binom{n-1}{i}, \quad \text{cannot be simplified}
+$$
+
+### The single-wire bit
+
+$$
+? = 2^1 = \binom{1}{0} + \binom{1}{1} = \binom{1}{1} + \binom{1}{0}
+$$
+
+## Parallel sum of types
+
+The parallel sum of types is a sequence of types (or cases) arranged
+side-by-side. All values of a sum type are the $i$th type being powered up
+with the rest being powered down.
+
+$$
+\bigoplus_{n=1}^m T_i = T_1 \oplus \ldots \oplus T_m
+$$
+
+## Product of types
+
+The product of types is a sequence of types arranged side-by-side,
+except all individual types are powered up.
+
+
+$$
+\bigotimes_{n=1}^m T_i = T_1 \otimes \ldots \otimes T_m
+$$
+
+# Properties of types
+## Decomposition identities
+
+$$
+2^{m+n} = 2^m \otimes 2^m \\
+n = \binom{n}{1} = (n-k) \oplus k = 1 \oplus \ldots \oplus 1
+$$
+
+## Cardinality of types
+
+$$|\cdot| : Type \rightarrow \mathbb N$$
+
+The cardinality function determines the number of possible values of a given type.
+
+$$\begin{aligned}
+\left|\binom{n}{k}\right| &= \binom{n}{k} \\
+\left|T_1 + \ldots + T_m\right| &= \sum_{i=1}^m |T_i| \\
+\left|T_1 \oplus \ldots \oplus T_m\right| &= \sum_{i=1}^m |T_i| \\
+\left|T_1 \otimes \ldots \otimes T_m\right| &= \prod_{i=1}^m |T_i|
+\end{aligned}$$
+
+## Width of types
+
+$$w : Type \rightarrow \mathbb N$$
+
+The width function counts the number of wires required to represent a given type.
+
+$$\begin{aligned}
+w\left(\binom{n}{k}\right) &= n \\
+w\left(T_1 + \ldots + T_m\right) &= w(T_1) = \ldots = w(T_m) \\
+w\left(T_1 \oplus \ldots \oplus T_m\right) &= \sum_{i=1}^m w(T_i) \\
+w\left(T_1 \otimes \ldots \otimes T_m\right) &= \sum_{i=1}^m w(T_i)
+\end{aligned}$$
+
+Note that $w(0) = w\left(\binom{0}{0}\right) = 1 \ne 0$
+
+## Count of types
+
+$$c : Type \rightarrow 2^\mathbb N$$
+
+The count function determines all possible numbers of powered wires of a given type.
+
+$$\begin{aligned}
+c\left(\binom{n}{k}\right) &= \{k\} \\
+c\left(T_1 + \ldots + T_m\right) &= \bigcup_{i=1}^m c(T_i) \\
+c\left(T_1 \oplus \ldots \oplus T_m\right) &= \bigcup_{i=1}^m c(T_i) \\
+c\left(T_1 \otimes \ldots \otimes T_m\right) &= \left\{ \sum_{i=1}^m c_i \ \Bigg|\ c_i \in c\left(T_i\right), 1 \le i \le m \right\}
+\end{aligned}$$
+
+Example:
+
+$$\begin{aligned}
+c\left(4 \otimes \left(2^3 \oplus \binom{7}{2}\right)\right)
+&= \left\{ a + b \ \Bigg|\ a \in c\left(\binom{4}{1}\right),\ b \in c\left(2^3 \oplus \binom{7}{2}\right) \right\} \\
+&= \left\{ 1 + b \ \Bigg|\ b \in c(2^3) \ \operatorname{or}\ b \in c\left( \binom{7}{2}\right) \right\} \\
+&= \left\{ 1 + b \ \Bigg|\ b \in \{0,1,2,3\} \ \operatorname{or}\ b \in \{2\} \right\} \\
+&= \left\{ 1,2,3,4 \right\}
+\end{aligned}$$
+
+## Simplification of types
+
+Repeat the following steps until no further changes can be made
+
+1. Sort the operands for $+$
+2. Apply associative property to $+, \oplus, \otimes$
+
+# Reversible functions
+
+$$\begin{aligned}
+Func ::=&\ \operatorname{perm}_{op}(Perm) \\
+&|\ \operatorname{cperm}_{op}(Perm) \\
+&|\ \operatorname{sym}\ Func \\
+&|\ \operatorname{trace}\ Func \\
+&|\ (Func \oplus Func \ldots) \\
+&|\ (Func \otimes Func \ldots) \\
+&|\ (Func \cdot Func \ldots)
+\end{aligned}$$
+
+where $Perm$ represents a permutation of a list, and
+$op$ is one of $+, \oplus, \otimes$.
+
+## Values
+### Function Application
+$$\begin{aligned}
+f : a \leftrightarrow b,\ x : a\\
+\hline
+(f\ @\ x) : b \quad
+\end{aligned}$$
+
+### Either type ($\oplus$ of two cases)
+$$\begin{aligned}
+x : a\quad\quad\ \ \\
+\hline
+\ (\operatorname{Left}\ x) : a \oplus b
+\ \end{aligned}$$
+$$\begin{aligned}
+y : b\quad\quad\ \ \\
+\hline
+\ (\operatorname{Right}\ y) : a \oplus b
+\ \end{aligned}$$
+
+
+### Tuple type ($\otimes$)
+$$\begin{aligned}
+x : a,\ y : b \ \ \ \\
+\hline
+\ (x, y) : a \otimes b
+\ \end{aligned}$$
+
+$$\begin{aligned}
+x_i : a_i,\ 1 < i \le m \quad\quad \\
+\hline
+\ (x_1, \ldots, x_m) : a_1 \otimes \ldots \otimes a_m
+\ \end{aligned}$$
+
+## Composition
+
+$$\begin{aligned}
+f : a \leftrightarrow c,\ g : c \leftrightarrow b \\
+\hline
+f \cdot g : a \leftrightarrow b \quad \quad
+\end{aligned}$$
+
+## Inverse
+$$\begin{aligned}
+f : a \leftrightarrow b \quad \\
+\hline
+\operatorname{sym}\ f : b \leftrightarrow a
+\end{aligned}$$
+
+The sym operator inverts a function.
+
+$$
+f \cdot \operatorname{sym} f =
+\operatorname{sym} f \cdot f = \operatorname{identity} : a \leftrightarrow a
+$$
+$$
+f\ @\ (\operatorname{sym} f\ @\ x)
+= \operatorname{sym} f \ @ \ (f @ x) = x
+$$
+
+## Trace
+
+$$\begin{aligned}
+\ f : a \oplus c \leftrightarrow b \oplus c \ \ \\
+\hline
+\quad \operatorname{trace}\ f : a \leftrightarrow b \quad
+\end{aligned}$$
+
+Let $x : a$, the trace operator repeatedly applies $f$
+for $n$ times such that $n$ is the smallest integer where:
+$$\operatorname{Left}((\operatorname{trace}\ f \ @\ (x : a)) : b)
+= f^n \ @\ (\operatorname{Left} x) =
+\operatorname{Left}\ (y : b)
+$$
+
+## Permutation
+
+A permutation of $n$, $P(n)$ represents a specific way to arrange:
+
+ - $n$ wires of a binomial or sum-of-binomials type
+ - $n$ cases of a $\oplus, \otimes$ t ype
+
+$$p \in P(n),\ T \in \mathbb P(Type),\ |T| = n$$
+
+$$
+\begin{aligned}
+\operatorname{perm}_+(p) &: \binom{n}{k} \leftrightarrow \binom{n}{k} \\
+\operatorname{perm}_+(p) &: \sum T \leftrightarrow \sum T \\
+\operatorname{perm}_\oplus(p) &: \bigoplus T \leftrightarrow \bigoplus T \\
+\operatorname{perm}_\otimes(p) &: \bigotimes T \leftrightarrow \bigotimes T
+\end{aligned}
+$$
+
+## Conditional permute
+
+The conditional permute function applies a permutation if and only if the
+very first wire is powered.
+
+$$
+\begin{aligned}
+\operatorname{cperm}_+(p) &: 2 \otimes \binom{n}{k} \leftrightarrow 2 \otimes \binom{n}{k} \\
+\operatorname{cperm}_+(p) &: 2 \otimes \sum T \leftrightarrow 2 \otimes \sum T \\
+\operatorname{cperm}_\oplus(p) &: 2 \otimes \bigoplus T \leftrightarrow 2 \otimes \bigoplus T \\
+\operatorname{cperm}_\otimes(p) &: 2 \otimes \bigotimes T \leftrightarrow 2 \otimes \bigotimes T
+\end{aligned}
+$$
+
+$$\begin{aligned}
+\operatorname{cperm}_{op}\ &@\ (\mathbf{true}, x)
+  &=&\quad (\mathbf{true},\ \operatorname{perm}_{op}(p)\ @\ x ) \\
+\operatorname{cperm}_{op}\ &@\ (\mathbf{false}, x)
+  &=&\quad (\mathbf{false},\ x)
+\end{aligned}$$
+
+### Example: Conditional NOT gate
+
+Let $p$ be the permutation $1, 2 \leftrightarrow 2, 1$
+
+$$\begin{aligned}
+\operatorname{cnot} &= \operatorname{cperm}_+(p) : 2 \otimes 2 \leftrightarrow 2 \otimes 2 \\
+&= \operatorname{cperm}_+(p) : \binom{2}{1} \otimes \binom{2}{1} \leftrightarrow \binom{2}{1} \otimes \binom{2}{1}
+\end{aligned}$$
