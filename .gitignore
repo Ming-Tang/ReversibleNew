@@ -7,7 +7,5 @@
 .fake
 .ionide
 .vs
-ReversibleNew/bin
-ReversibleNew/obj
-Test/bin
-Test/obj
+bin/
+obj/
