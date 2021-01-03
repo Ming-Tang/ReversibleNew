@@ -1,4 +1,5 @@
 module Reversible.RType
+open System.Collections.Generic
 
 type Wires = bool list
 
@@ -16,11 +17,23 @@ type RType =
 
 let inline B n k = TBinom(n, k)
 let inline C n = TBinom(n, 1)
-let bit = TBinom(2, 1)
-let zero = TBinom(0, 0)
+let Bit = TBinom(2, 1)
+let Zero = TBinom(0, 0)
+let One = TBinom(1, 1)
+
+let rec isValid = function
+  | TBinom(n, k) -> n > 0 && k > 0 && n >= k
+  | TProd [] | TSum [] -> false
+  | TProd xs | TSum xs -> Seq.forall isValid xs
+
+let rec limit x d = function
+  | TBinom(n, _) -> n <= x
+  | TProd _ | TSum _ when d <= 0 -> false
+  | TProd xs | TSum xs when xs.Length < x -> Seq.forall (limit x (d - 1)) xs
+  | TProd _ | TSum _ -> false
 
 let choose n k =
-  if k > n then
+  if k > n || n < 0 || k < 0 then
     0
   else
     let mutable n1 = n
@@ -38,11 +51,12 @@ let rec card = function
   | TProd(xs) -> xs |> Seq.map card |> Seq.fold (*) 1
 
 let rec width = function
+  | TBinom(n, _) when n < 0 -> n
   | TBinom(n, _) -> n
   | TSum(xs) | TProd(xs) -> xs |> Seq.sumBy width
 
 let rec count = function
-  | TBinom(n, k) -> Set.singleton k
+  | TBinom(_, k) -> Set.singleton k
   | TSum(xs) -> Set.unionMany (Seq.map count xs)
   | TProd([]) -> Set.singleton 0
   | TProd(x :: xs) ->
@@ -53,20 +67,28 @@ let rec count = function
     }
     |> Set.ofSeq
 
+let private combsMemo = new Dictionary<int * int, Wires[]>(128)
 let rec combs n k =
-  if k > n then
+  if k > n || n < 0 || k < 0 then
     Seq.empty : Wires seq
   elif n = k then
     Seq.singleton [for i in 1 .. n -> true]
   elif k = 1 then
     seq { for i in 1 .. n -> [for j in 1 .. n -> i = j] }
   else
-    seq {
-      for c1 in combs (n - 1) k ->
-        c1 @ [false]
-      for c1 in combs (n - 1) (k - 1) ->
-        c1 @ [true]
-    }
+    if combsMemo.ContainsKey((n, k)) then
+      Seq.ofArray combsMemo.[(n, k)]
+    else
+      let res = 
+        [|
+          for c1 in combs (n - 1) k ->
+            c1 @ [false]
+          for c1 in combs (n - 1) (k - 1) ->
+            c1 @ [true]
+        |]
+
+      if n <= 8 then combsMemo.Add((n, k), res)
+      Seq.ofArray res
 
 let empty t = List.init (width t) (fun _ -> false) : Wires
 
@@ -88,6 +110,8 @@ let rec vals = function
     }
 
 let rec collect = function
+  | TSum([]) -> Zero
+  | TProd([]) -> One
   | TSum([x]) | TProd([x]) -> x
   | TSum(x1 :: xs) ->
     let xs' = List.map collect xs
@@ -110,3 +134,4 @@ let rec collect = function
     | x1, x2 -> TProd([x1; x2])
 
   | b -> b
+

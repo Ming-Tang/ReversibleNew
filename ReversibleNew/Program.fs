@@ -1,19 +1,29 @@
 ﻿open Reversible
 open Reversible.RType
+open Reversible.Machine
+open Reversible.MachineState
 
 [<EntryPoint>]
 let main argv =
-  Perm.create [1; 3; 2; 0]
-  |> Perm.expand [5; 3; 2; 1]
-  |> Array.ofSeq
-  |> Perm.create
+  vstack (Block [[Identity 3]; [Identity 3]]) (Block [[Identity 3]; [TGate PlusMinus; Identity 1]; [Permute <| Perm.create [|1;2;0;3|]]])
   |> printfn "%A"
+  printfn ""
+
+  //let b1 = Block [[Identity 1; Permute (Perm.reverse 5); Identity 1]; [Identity 7]]
+  let b1 = (Block [[Identity 1; Identity 1; Identity 1]; [Identity 1; TGate PlusMinus];
+                   [TGate PlusMinus; Identity 1; Identity 1]])
+  let ms = MachineState(Machine.hstack b1 (Machine.inverse b1))
+  printfn "%A" ms.Block
+  //ms.State.[0] <- [| true; false; false; true; false; true; true |]
+  ms.State.[0] <- [| false; false; false |]
+  for i in 1 .. Machine.depth ms.Block do
+    ms.State |> Seq.map (Array.toList >> showWires) |> Seq.iter (printfn "%s")
+    printfn ""
+    ms.Step()
+
+  printfn ""
     
-  printfn "%A" (Perm.create [3; 1; 0; 4; 2])
-  printfn "%A" (Perm.create [3; 1; 0; 4; 2] |> Perm.invert)
-  printfn "%A" (Perm.create [3; 1; 0; 4; 2] |> Perm.invert |> Perm.invert)
-  printfn "%A" (Perm.create [0; 1; 2; 3])
-    
+#if FALSE
   combs 7 3
   |> Seq.map showWires
   |> Seq.iter (printfn "%s")
@@ -33,5 +43,7 @@ let main argv =
   vals t1
   |> Seq.map showWires
   |> Seq.iter (printfn "%s")
+#endif
+
   0
     

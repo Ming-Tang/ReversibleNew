@@ -1,5 +1,6 @@
 module Reversible.Perm
 
+[<AutoOpen>]
 type Perm = private Perm of int array with
   member perm.ToArray() =
     let (Perm p) = perm
@@ -9,6 +10,12 @@ type Perm = private Perm of int array with
     with get() =
       let (Perm p) = perm
       p.Length
+
+let identity n = Perm [| 0 .. n - 1 |]
+
+let reverse n = Perm (Array.rev [| 0 .. n - 1 |])
+
+let isIdentity p = p = identity p.Length
 
 let create (xs: int seq) : Perm =
   let arr: int array = Array.ofSeq xs
@@ -35,5 +42,12 @@ let invert (Perm p) : Perm =
 
   create arr
 
-let apply (Perm p) (arr : _ array) =
+let apply' (Perm p) (arr : _ array) =
   seq { for i in p -> arr.[i] }
+
+let apply p arr =
+  apply' p arr |> Array.ofSeq
+
+let compose g (Perm f) =
+  Perm (apply g f)
+
