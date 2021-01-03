@@ -79,16 +79,19 @@ let rec combs n k =
     if combsMemo.ContainsKey((n, k)) then
       Seq.ofArray combsMemo.[(n, k)]
     else
-      let res = 
-        [|
-          for c1 in combs (n - 1) k ->
-            c1 @ [false]
-          for c1 in combs (n - 1) (k - 1) ->
-            c1 @ [true]
-        |]
+      lock combsMemo <| fun () ->
+        let res = 
+          [|
+            for c1 in combs (n - 1) k ->
+              c1 @ [false]
+            for c1 in combs (n - 1) (k - 1) ->
+              c1 @ [true]
+          |]
 
-      if n <= 8 then combsMemo.Add((n, k), res)
-      Seq.ofArray res
+        if n <= 8 then combsMemo.Add((n, k), res)
+        Seq.ofArray res
+
+do combs 5 5 |> ignore
 
 let empty t = List.init (width t) (fun _ -> false) : Wires
 

@@ -11,7 +11,7 @@ type MachineState(block : Block) =
 
   let (Block xs) = block
   let fronts = [| for x in xs -> Array.ofList x |]
-  let n = fronts.Length
+  let depth = fronts.Length
   let zeroState() =
     [| 
       yield Array.zeroCreate (inSize block)
@@ -25,10 +25,27 @@ type MachineState(block : Block) =
   member s.State with get() = state
 
   member s.Clear() = state <- zeroState()
+
+  member s.Evaluate(inputs : bool[] seq) =
+    [|
+      let mutable inputs = List.ofSeq inputs
+      let len = inputs.Length
+      for i in 1 .. depth + inputs.Length - 1 do
+        match inputs with
+        | [] -> ()
+        | x :: xs ->
+          state.[0] <- Array.copy x
+          inputs <- xs
+        s.Step()
+        if i - depth >= 0 then
+          yield Array.copy state.[state.Length - 1]
+    |]
+
+
   member s.Step() =
     let newState = Array.map Array.copy state
     newState.[0] <- Array.zeroCreate newState.[0].Length
-    for i in 0 .. n - 1 do
+    for i in 0 .. depth - 1 do
       let i1 = i + 1
       let mutable j = 0
       let mutable j1 = 0

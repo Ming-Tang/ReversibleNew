@@ -21,9 +21,8 @@ let create (xs: int seq) : Perm =
   let arr: int array = Array.ofSeq xs
   if (Set.ofSeq xs).Count < arr.Length then
     failwith "perm: repeat elements"
-  if arr
-     |> Seq.filter (fun x -> x < 0 || x >= arr.Length)
-     |> Seq.isEmpty |> not then
+  if arr |> Seq.filter (fun x -> x < 0 || x >= arr.Length)
+         |> Seq.isEmpty |> not then
     failwith "perm: invalid index"
   Perm(arr)
 

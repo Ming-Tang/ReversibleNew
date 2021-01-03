@@ -214,7 +214,7 @@ module RTypeTests =
   let ``collect preserves vals``(ValidRType t) =
     Set.ofSeq (RType.vals (RType.collect t)) = Set.ofSeq (RType.vals t)
 
-[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
+[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 100)>]
 module MachineTests =
   [<Property>]
   let ``inverse is valid``(ValidBlock f) =
@@ -260,7 +260,7 @@ module MachineTests =
   let ``vstack: outSize (f + g) = outSize f + outSize g``(ValidBlock f, ValidBlock g) =
     Machine.outSize (Machine.vstack f g) = Machine.outSize f + Machine.outSize g
 
-[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
+[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 100)>]
 module MachineStateTests =
   [<Property>]
   let ``run machine based on identity elements``(size : int, depth : int) =
@@ -332,7 +332,6 @@ module MachineStateTests =
     let identity = Machine.hstack f (Machine.inverse f)
     //failwithf "%A" (ms0, identity)
     let ms = MachineState(identity)
-    ms.State.[0] <- input
     ms.State.[0] <- input
     try
       for i in 1 .. Machine.depth identity do

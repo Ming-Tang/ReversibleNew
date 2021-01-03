@@ -13,15 +13,42 @@ let main argv =
   let b1 = (Block [[Identity 1; Identity 1; Identity 1]; [Identity 1; TGate PlusMinus];
                    [TGate PlusMinus; Identity 1; Identity 1]])
   let ms = MachineState(Machine.hstack b1 (Machine.inverse b1))
+  printfn "%A" <| ms.Evaluate(
+    [|
+      [| true; false; false |]
+      [| false; true; false |]
+      [| false; false; true |]
+      [| true; true; false |]
+      [| true; false; true |]
+      [| false; true; true |]
+      [| true; true; true |]
+    |] 
+  )
+
+  printfn "---------"
+  let ms = MachineState(Machine.hstack b1 (Machine.inverse b1))
   printfn "%A" ms.Block
   //ms.State.[0] <- [| true; false; false; true; false; true; true |]
-  ms.State.[0] <- [| false; false; false |]
   for i in 1 .. Machine.depth ms.Block do
+    if i = 1 then
+      ms.State.[0] <- [| true; false; false |]
+    elif i = 2 then
+      ms.State.[0] <- [| false; true; false |]
+    elif i = 3 then
+      ms.State.[0] <- [| false; false; true |]
+    elif i = 4 then
+      ms.State.[0] <- [| true; true; false |]
+    elif i = 5 then
+      ms.State.[0] <- [| true; false; true |]
+
     ms.State |> Seq.map (Array.toList >> showWires) |> Seq.iter (printfn "%s")
     printfn ""
     ms.Step()
 
-  printfn ""
+  printfn "----------"
+  for i in 1 .. 5 do
+    ms.State |> Seq.map (Array.toList >> showWires) |> Seq.last |> printfn "%s"
+    ms.Step()
     
 #if FALSE
   combs 7 3
