@@ -32,6 +32,7 @@ wires powered up. The upper wire corresponds to false and the lower wire corresp
 - Identity $I_n : n \leftrightarrow n$: Given $n$ inputs, copy to $n$ outputs
 - Wire permutation $P(p) : n \leftrightarrow n$: Given $n$ inputs, copy to $n$ outputs after applying permutation $p$
   - $R_n$ is the reverse permutation with $n$ wires
+  - $S_{m,n}$ swaps two bundles of wires of $m \oplus n \leftrightarrow n \oplus m$
 - Conditional diverge $T^+, T^- : 2 \leftrightarrow 3$: see below
 - Conditional converge $\tilde T^+, \tilde T^- : 3 \leftrightarrow 2$: 3 outputs and 2 inputs, see below
 
@@ -93,7 +94,7 @@ The horizontal stack operation composes two machines.
 
 ## Matrix notation
 
-Instead of writing `\oplus` and `\cdot`, we can stack sub-machines in a matrix:
+Instead of writing $\oplus$ and $\cdot$, we can stack sub-machines in a matrix:
 
 $$(T^+ \oplus R_2) \cdot (I_1 \oplus R_3 \oplus I_1) \cdot I_5 =
 \begin{bmatrix}
@@ -106,3 +107,37 @@ I_1 \\ R_3 \\ I_1
 & I_5
 \end{bmatrix}
 $$
+
+# Conditional permute for $n$ wires
+
+$$
+\operatorname{cperm}(p) : (2 + n) \leftrightarrow (2 + n)
+$$
+$$\operatorname{cperm}(p)  =
+\begin{bmatrix}
+\begin{matrix}I_1 \\ T^+_n\end{matrix} &
+\begin{matrix}I_1 \\ S_{2n,1} \end{matrix} &
+\begin{matrix}I_2 \\ P(p) \\ I_n \end{matrix} &
+\begin{matrix}R_2 \\ S_{2n,2n} \end{matrix} &
+\begin{matrix}I_1 \\ T^+_n \end{matrix} &
+\begin{matrix}R_2 \\ I_n \end{matrix} &
+
+\end{bmatrix}
+$$
+
+## Multi-conditional diverge
+
+$$\begin{aligned}
+T^\pm_1 &= T^\pm &:&\quad 2 \leftrightarrow 3 \\
+T^\pm_{n+1} &= \begin{bmatrix} \begin{matrix}
+I_1 \\ T^\pm \\ I_n
+\end{matrix}
+\ \begin{matrix}
+I_2 \\ T^\pm_n
+\end{matrix}
+\ \begin{matrix}
+I_1 \\ S_{1,n} \\ I_{n+1}
+\end{matrix}
+\end{bmatrix}
+&:&\quad (n + 2) \leftrightarrow (n + 2)
+\end{aligned}$$
