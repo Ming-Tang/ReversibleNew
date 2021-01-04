@@ -1,0 +1,108 @@
+---
+title: ''
+output:
+  html_document:
+    number_sections: true
+    toc: yes
+    toc-title: Table of Contents
+---
+
+Our reversible machine is modeled after the [billiard-ball computer](https://en.wikipedia.org/wiki/Billiard-ball_computer).
+
+The fundamental branching operation is the billiard-ball AND gate described
+by the article linked.
+
+To represent more complex programs, parallel comutations are expressed through
+vertical arrangement of elements ($\oplus$), while serial computation is expressed
+through horizontal arrangement ($\cdot$).
+
+# Data representation
+
+Data in reversible programming is represented in a sequence of binary
+values following a datatype described in the [previous document](./Main.Rmd).
+
+An additional constraint imposed is that all possible representations must
+require same number of powered up bits. For example, the type $\binom{3}{1} + \binom{3}{2}$ is not allowed since it requires variable number of powered up wires.
+
+For example, a boolean is represented using two wires with one of the two
+wires powered up. The upper wire corresponds to false and the lower wire corresponds to true.
+
+# Elements
+
+- Identity $I_n : n \leftrightarrow n$: Given $n$ inputs, copy to $n$ outputs
+- Wire permutation $P(p) : n \leftrightarrow n$: Given $n$ inputs, copy to $n$ outputs after applying permutation $p$
+  - $R_n$ is the reverse permutation with $n$ wires
+- Conditional diverge $T^+, T^- : 2 \leftrightarrow 3$: see below
+- Conditional converge $\tilde T^+, \tilde T^- : 3 \leftrightarrow 2$: 3 outputs and 2 inputs, see below
+
+The conditional diverge operation is the reversible AND gate.
+The inputs for $T^+$ and $T^-$ are ordered as follows:
+
+ - 1-in
+ - 0-in
+
+The outputs for $T^-$ are:
+
+ - 0-out
+ - 1-out
+ - AND-output
+
+The outputs for $T^+$ are:
+
+ - 0-out
+ - AND-output
+ - 1-out
+
+For inverse gates $\tilde T^-, \tilde T^+$, the inputs and outputs are swapped.
+
+# Reversible machines
+
+A reversible machine with depth $d$ is an array of $d$ fronts, where a front is an array of elements.
+
+The execution state of a machine is an array of $d + 1$ boolean arrays where
+each boolean array is an intermediate state between two fronts.
+
+# Execution step
+
+At each step, the new execution state $S'$ is computed by evaluating each front $f_i$:
+
+$$S'[i + 1] := f_i(S[i]),\quad 0 \le i < d$$
+
+# Combining machines
+
+## Vertical stack
+
+$$\begin{aligned}
+\quad f : m_1 \leftrightarrow n_1,\quad g : m_2 \leftrightarrow n_2\quad\\
+\hline
+f \oplus g : m_1 + m_2 \leftrightarrow n_1 + n_2\quad
+\end{aligned}$$
+
+The inputs and outputs are concatenated. If one of the machines have
+higher depth than the other, a padding of identity machines will be added to match the depths.
+
+## Horizontal stack
+
+$$\begin{aligned}
+\quad f : m \leftrightarrow p,\quad g : p \leftrightarrow n\quad\\
+\hline
+f \cdot g : m_1 \leftrightarrow n\quad\quad\quad
+\end{aligned}$$
+
+The horizontal stack operation composes two machines.
+
+## Matrix notation
+
+Instead of writing `\oplus` and `\cdot`, we can stack sub-machines in a matrix:
+
+$$(T^+ \oplus R_2) \cdot (I_1 \oplus R_3 \oplus I_1) \cdot I_5 =
+\begin{bmatrix}
+\begin{matrix}
+T^+ \\ R_2 \\
+\end{matrix}
+\ \ \begin{matrix}
+I_1 \\ R_3 \\ I_1
+\end{matrix}
+& I_5
+\end{bmatrix}
+$$
