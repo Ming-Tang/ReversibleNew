@@ -14,6 +14,7 @@
     <Compile Include="Perm.fs" />
     <Compile Include="RType.fs" />
     <Compile Include="Machine.fs" />
+    <Compile Include="MachineBuilder.fs" />
     <Compile Include="MachineState.fs" />
     <Compile Include="RFunc.fs" />
     <Compile Include="Reversible.fs" />

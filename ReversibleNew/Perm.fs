@@ -29,10 +29,11 @@ let create (xs: int seq) : Perm =
 let expand (ws: int seq) (Perm p) =
   seq {
     let ws = Array.ofSeq ws
-    let offs = Seq.scan (fun x y -> x + y + 1) 0 ws |> Array.ofSeq
+    let offs = Seq.scan (fun x y -> x + y) 0 ws |> Array.ofSeq
     for i in p do
       yield! seq { offs.[i] .. offs.[i + 1] - 1 }
   }
+  |> create
 
 let invert (Perm p) : Perm =
   let arr = Array.init p.Length (fun _ -> 0)

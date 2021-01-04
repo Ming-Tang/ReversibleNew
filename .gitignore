@@ -10,3 +10,5 @@
 bin/
 obj/
 *.cache
+Tests/bin
+Tests/obj

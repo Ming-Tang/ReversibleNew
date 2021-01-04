@@ -42,6 +42,8 @@ let inverseElement =
 
 type Block = Block of Element list list
 
+let elem x = Block [[x]]
+
 let depth (Block es) = es.Length
 
 let inSize (Block es) =
@@ -113,3 +115,4 @@ let inverse (Block xs) =
   |> List.rev
   |> List.map (List.map inverseElement)
   |> Block
+

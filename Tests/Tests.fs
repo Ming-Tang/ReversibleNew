@@ -330,7 +330,6 @@ module MachineStateTests =
     let input = Array.copy ms0.State.[0]
     let expected = Array.copy input
     let identity = Machine.hstack f (Machine.inverse f)
-    //failwithf "%A" (ms0, identity)
     let ms = MachineState(identity)
     ms.State.[0] <- input
     try
@@ -340,4 +339,56 @@ module MachineStateTests =
       true ==> (expected = ms.State.[Machine.depth identity])
     with MachineState.TGateInvError _ -> 
       false ==> true
+
+  [<Property>]
+  let ``composing a machine with its inverse performs identity (pipelined)``(InitialMachineState ms0) =
+    let f = ms0.Block
+    let input = Array.copy ms0.State.[0]
+    let input1 = Array.map not input
+    let inputs = [|
+      for i in 1 .. 5 do
+        yield input
+        yield input1
+    |]
+    let expected = Array.map Array.copy inputs
+    let identity = Machine.hstack f (Machine.inverse f)
+    let ms = MachineState(identity)
+    try
+      let actual = ms.Evaluate(inputs)
+      true ==> (expected = actual)
+    with MachineState.TGateInvError _ -> 
+      false ==> true
+
+[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 100)>]
+module MachineBuilderTests =
+  [<Property>]
+  let ``swap performs wire bundle swap``(a : bool[], b : bool[]) =
+    (a.Length > 0 && b.Length > 0) ==> lazy (
+      let ms = MachineState(MachineBuilder.S a.Length b.Length)
+      let actual = ms.Evaluate([Array.append a b])
+      let expected = [| Array.append b a |]
+      expected = actual
+    )
+
+  [<Property>]
+  let ``Tn performs T on multiple wires``(a : bool[], b : bool, dir: Machine.TDir) =
+    (a.Length > 0) ==> lazy (
+      let ms = MachineState(MachineBuilder.Tn dir a.Length)
+      let actual = ms.Evaluate([Array.append [| b |] a])
+      let p = (dir = Machine.TDir.PlusMinus) = b
+      let expected = [| 
+        [|
+          if p then
+            yield! a
+            yield! Array.map (fun _ -> false) a
+          else
+            yield! Array.map (fun _ -> false) a
+            yield! a
+          yield b
+        |]
+      |]
+      expected = actual
+    )
+
+  // TODO test cperm
 

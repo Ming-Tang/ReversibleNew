@@ -41,7 +41,6 @@ type MachineState(block : Block) =
           yield Array.copy state.[state.Length - 1]
     |]
 
-
   member s.Step() =
     let newState = Array.map Array.copy state
     newState.[0] <- Array.zeroCreate newState.[0].Length
@@ -64,7 +63,7 @@ type MachineState(block : Block) =
           j1 <- j1 + p.Length
 
         | TGate d ->
-          let jx, jc = j, j + 1
+          let jc, jx = j, j + 1
           let jm, jp, jc' =
              match d with
              | MinusPlus -> j1, j1 + 1, j1 + 2
@@ -82,7 +81,7 @@ type MachineState(block : Block) =
              match d with
              | MinusPlus -> j, j + 1, j + 2
              | PlusMinus -> j + 1, j, j + 2
-          let jx, jc = j1, j1 + 1
+          let jc, jx = j1, j1 + 1
 
           let c = state.[i].[jc']
           let from = state.[i].[if c then jp else jm]
@@ -103,4 +102,7 @@ type MachineState(block : Block) =
       new string(Array.map (fun b -> if b then '1' else '0') ba)
 
     sprintf "MachineState %A" (block, state |> Array.map f)
+
+let runMachine b e = 
+  MachineState(b).Evaluate(e)
 

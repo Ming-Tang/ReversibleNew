@@ -125,12 +125,12 @@ $$\operatorname{cperm}(p)  =
 \end{bmatrix}
 $$
 
-## Multi-conditional diverge
+## Definition of $T^\pm_n$
 
 $$\begin{aligned}
 T^\pm_1 &= T^\pm &:&\quad 2 \leftrightarrow 3 \\
 T^\pm_{n+1} &= \begin{bmatrix} \begin{matrix}
-I_1 \\ T^\pm \\ I_n
+T^\pm \\ I_n
 \end{matrix}
 \ \begin{matrix}
 I_2 \\ T^\pm_n
@@ -139,5 +139,5 @@ I_2 \\ T^\pm_n
 I_1 \\ S_{1,n} \\ I_{n+1}
 \end{matrix}
 \end{bmatrix}
-&:&\quad (n + 2) \leftrightarrow (n + 2)
+&:&\quad (n + 1) \leftrightarrow (2n + 1)
 \end{aligned}$$

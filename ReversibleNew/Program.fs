@@ -3,8 +3,22 @@ open Reversible.RType
 open Reversible.Machine
 open Reversible.MachineState
 
+let showState x =
+  x |> Seq.map (Array.toList >> showWires) |> Seq.iter (printfn "%s")
 [<EntryPoint>]
 let main argv =
+
+  printfn "%A" (MachineBuilder.Tn TDir.PlusMinus 3)
+  let inputs = [|
+    [| false; false |]
+    [| false; true |]
+    [| true; false |]
+    [| true; true |]
+  |]
+  runMachine (MachineBuilder.Tn TDir.PlusMinus 1) inputs
+  |> showState
+  printfn ""
+
   vstack (Block [[Identity 3]; [Identity 3]]) (Block [[Identity 3]; [TGate PlusMinus; Identity 1]; [Permute <| Perm.create [|1;2;0;3|]]])
   |> printfn "%A"
   printfn ""
@@ -41,13 +55,13 @@ let main argv =
     elif i = 5 then
       ms.State.[0] <- [| true; false; true |]
 
-    ms.State |> Seq.map (Array.toList >> showWires) |> Seq.iter (printfn "%s")
+    ms.State |> showState
     printfn ""
     ms.Step()
 
   printfn "----------"
   for i in 1 .. 5 do
-    ms.State |> Seq.map (Array.toList >> showWires) |> Seq.last |> printfn "%s"
+    ms.State |> Seq.last |> Seq.singleton |> showState
     ms.Step()
     
 #if FALSE
