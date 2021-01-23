@@ -1,7 +1,11 @@
 module Reversible.Perm
 
 [<AutoOpen>]
-type Perm = private Perm of int array with
+[<StructuredFormatDisplay("(Perm.create {Array})")>]
+type Perm = private Perm of int[] with
+  member private perm.Array
+    with get() = let (Perm p) = perm in p
+
   member perm.ToArray() =
     let (Perm p) = perm
     Array.copy p

@@ -7,7 +7,7 @@ exception TGateInvError of p : bool * m : bool * c: bool
 type MachineState(block : Block) = 
   do
     if not (isValid block) then
-      failwith "Cannot create MachineState from invalid block"
+      failwithf "Cannot create MachineState from invalid block: %A" block
 
   let (Block xs) = block
   let fronts = [| for x in xs -> Array.ofList x |]
@@ -21,10 +21,15 @@ type MachineState(block : Block) =
 
   let mutable state: bool[][] = zeroState()
 
+  let validateInput (x : bool[]) =
+    if x.Length <> state.[0].Length then
+      failwithf "Invalid input size: Expecting %d but got %d" 
+        state.[0].Length x.Length
+
   member s.Block with get() = block
   member s.State with get() = state
 
-  member s.Clear() = state <- zeroState()
+  member s.Reset() = state <- zeroState()
 
   member s.Evaluate(inputs : bool[] seq) =
     [|
@@ -34,6 +39,7 @@ type MachineState(block : Block) =
         match inputs with
         | [] -> ()
         | x :: xs ->
+          validateInput x
           state.[0] <- Array.copy x
           inputs <- xs
         s.Step()

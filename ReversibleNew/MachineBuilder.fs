@@ -33,16 +33,23 @@ let rec Tn dir = function
       [ I 1; S 1 n; I (n + 1) ]
     ]
 
-let rec cperm (p : Perm.Perm) =
-  let n = p.Length
+let cond a b =
+  let n = inSize a
+  let n' = inSize b
+  let m = outSize a
+  let m' = outSize b
+  if Set.ofList [n; n'; m; m'] |> Set.count |> (<>) 1 then
+    failwith "cond: must have same input and output sizes"
+
   let n2 = 2 * n
   matrix [
     [ I 1; Tn PlusMinus n ]
     [ I 1; S n2 1 ]
-    [ I 2; P p; I n ]
-    [ R 2; S n2 n2 ]
+    [ R 2; a; b ]
+    [ I 1; S 1 n2 ]
     [ I 1; inverse (Tn MinusPlus n) ]
-    [ I 1; S n 1 ]
     [ R 2; I n ]
   ]
+
+let cperm (p : Perm.Perm) = cond (P p) (I p.Length)
 

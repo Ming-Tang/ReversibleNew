@@ -7,6 +7,14 @@ let showState x =
   x |> Seq.map (Array.toList >> showWires) |> Seq.iter (printfn "%s")
 [<EntryPoint>]
 let main argv =
+  printfn "%A" (MachineBuilder.S 8 1)
+
+  printfn "%A" (MachineState(MachineBuilder.cperm <| Perm.reverse 8).Evaluate([|
+    [| false; true;
+       true; true; false; true; false; true; true; false |]
+  |]))
+  printfn ""
+  printfn ""
 
   printfn "%A" (MachineBuilder.Tn TDir.PlusMinus 3)
   let inputs = [|

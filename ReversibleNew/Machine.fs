@@ -78,15 +78,14 @@ let rec private checkFronts prev =
   | x :: xs ->
     let sa = inSize (Block [x])
     let sb = outSize (Block [x])
-    (Option.isNone prev || (Some sa = prev)) && (
+    sa > 0 && sb > 0 && (Option.isNone prev || (Some sa = prev)) && (
       checkFronts (Some sb) xs
     )
 
 let isValid = 
   function
   | Block [] -> false
-  | Block xs ->
-    ((Block xs) = normalize (Block xs)) && checkFronts None xs
+  | Block xs -> checkFronts None xs
 
 let hstack (Block a) (Block b) =
   if a = [] then Block b
@@ -94,7 +93,7 @@ let hstack (Block a) (Block b) =
   else
     let sa, sb = outSize (Block a), inSize (Block b)
     if sa <> sb then
-      failwithf "hstack: Different sizes: %d %d" sa sb
+      failwithf "hstack: Different sizes: %d %d : %A" sa sb (Block a, Block b)
     Block (a @ b)
 
 let vstack (Block xs) (Block ys) =
