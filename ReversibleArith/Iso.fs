@@ -132,41 +132,41 @@ let rec symIsoToLaTeX depth si : string =
     |> String.concat " \\cdot "
     |> sprintf " %s "
 
-type Iso<'a, 'b> = Iso of f : ('a -> 'b) * g : ('b -> 'a) * si : SymIso
+type Iso<'a, 'b> = Iso of f : ('a -> 'b) * g : ('b -> 'a) * si : SymIso Lazy
 
 type BIso<'a, 'b> = unit -> Iso<'a, 'b>
 let inline LIso(f, g, s) : BIso<_, _> = fun () -> Iso(f, g, s)
 let inline BIso(f, g, s) : BIso<_, _> = fun () -> Iso(f, g, s)
 let inline (|BIso|) (x : BIso<_, _>) = match x() with Iso(f, g, s) -> f, g, s
 
-let group n (BIso(a, b, s)) = BIso(a, b, SGroup(n, s))
+let group n (BIso(a, b, s)) = BIso(a, b, lazy SGroup(n, s.Value))
 
 // let showBIso (BIso(_, _, s)) = (sprintf "%A" <| symIsoToObj s).Replace("\"", "")
-let showBIso n (BIso(_, _, s)) = sprintf "%s" <| symIsoToLaTeX n s
-let showBIso' (BIso(_, _, s)) = sprintf "%A" s
+let showBIso n (BIso(_, _, s)) = sprintf "%s" <| symIsoToLaTeX n s.Value
+let showBIso' (BIso(_, _, s)) = sprintf "%A" s.Value
 
 let (<<|) (BIso(f, _, _)) x = f x
 let (>>>) (BIso(f, f', fs)) (BIso(g, g', gs)) = 
-  BIso(f >> g, g' >> f', SCompose [fs; gs])
+  BIso(f >> g, g' >> f', lazy SCompose [fs.Value; gs.Value])
 
 let (&&&) (BIso(f, f', fs)) (BIso(g, g', gs)) =
-  BIso((fun (x, y) -> (f x, g y)), (fun (x, y) -> (f' x, g' y)), SPair(fs, gs))
+  BIso((fun (x, y) -> (f x, g y)), (fun (x, y) -> (f' x, g' y)), lazy SPair(fs.Value, gs.Value))
 
 let sym (BIso(a, b, s)) =
-  BIso(b, a, SSym s)
+  BIso(b, a, lazy SSym s.Value)
 
 let inline (~~) x = sym x
 
 let id : BIso<'a, 'a> = fun _ ->
-  Iso((fun x -> x), (fun x -> x), SFunc(FId <| Widths.getFrom<'a>()))
+  Iso((fun x -> x), (fun x -> x), lazy SFunc(FId <| Widths.getFrom<'a>()))
 
 let comm : BIso<'a * 'b, 'b * 'a> = fun _ ->
-  let wa, wb = Widths.getFrom<'a>(), Widths.getFrom<'b>()
   Iso((fun (x, y) -> y, x), (fun (x, y) -> y, x), 
-      SFunc(FComm <| Option.map2 (fun a b -> a, b) wa wb))
+      lazy (let wa, wb = Widths.getFrom<'a>(), Widths.getFrom<'b>()
+            in SFunc(FComm <| Option.map2 (fun a b -> a, b) wa wb)))
 
 let assoc : BIso<('a * 'b) * 'c, _> = fun _ ->
-  let wa, wb, wc = Widths.getFrom<'a>(), Widths.getFrom<'b>(), Widths.getFrom<'c>()
   Iso((fun ((x, y), z) -> x, (y, z)), (fun (x, (y, z)) -> (x, y), z), 
-      SFunc (FAssoc <| Option.map3 (fun a b c -> a, b, c) wa wb wc))
+      lazy (let wa, wb, wc = Widths.getFrom<'a>(), Widths.getFrom<'b>(), Widths.getFrom<'c>()
+            SFunc (FAssoc <| Option.map3 (fun a b c -> a, b, c) wa wb wc)))
 

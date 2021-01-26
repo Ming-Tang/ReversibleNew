@@ -2,30 +2,35 @@
 open Iso
 open Num
 
-let compl b = BIso(complDigit, complDigit, SFunc (FSucc (b :> IBase).Base))
-let succ b = BIso(succDigit, predDigit, SFunc (FSucc (b :> IBase).Base))
+/// Digit complement
+let compl b = BIso(complDigit, complDigit, lazy SFunc (FSucc (b :> IBase).Base))
+
+/// Digit successor
+let succ b = BIso(succDigit, predDigit, lazy SFunc (FSucc (b :> IBase).Base))
 
 /// Decompose a Num into first and rest digits
-let num (Bases bs) = BIso(mkNum, unNum, SFunc (FNum bs))
+let num (Bases bs) = BIso(mkNum, unNum, lazy SFunc (FNum bs))
 
 /// Conditionally apply f when c = i
 let cond (Digit(a, b) as i) (BIso(f, g, s)) =
   BIso((fun (v, x) -> (v, (if i = v then f x else x))),
-       (fun (v, x) -> (v, (if i = v then g x else x))), SPFunc(PFCond(a, b.Base), [s]))
+       (fun (v, x) -> (v, (if i = v then g x else x))), 
+       lazy SPFunc(PFCond(a, b.Base), [s.Value]))
 
 /// Conditionally apply f when c = base - 1
 let condLast (b0 : 'b when 'b :> IBase) (BIso(f, g, s)) =
   BIso((fun ((Digit(n, (Base b) : 'b) as v), x) -> (v, (if n + 1 = b then f x else x))),
        (fun ((Digit(n, Base b) as v), x) -> (v, (if n + 1 = b then g x else x))),
-       SPFunc(PFCondLast b0.Base, [s]))
+       lazy SPFunc(PFCondLast b0.Base, [s.Value]))
 
 /// Repeat f i times
 let rep (Base b) (BIso(f, g, s)) =
   let rec rep i f x =
     if i <= 0 then x else rep (i - 1) f (f x)
+
   BIso((fun ((v : Digit<_>), x) -> (v, rep (numberValue v) f x)),
        (fun (v, x) -> (v, rep (numberValue v) g x)),
-       SPFunc(PFRep b, [s]))
+       lazy SPFunc(PFRep b, [s.Value]))
 
 /// Repeat f i times, with reversed arguments
 let rep' b bi = (comm >>> rep b bi >>> comm)
@@ -34,6 +39,7 @@ let rep' b bi = (comm >>> rep b bi >>> comm)
 module Builders =
   type SuccBuilder<'b when 'b :> INum> =
     abstract member Succ : BIso<'b, 'b>
+    abstract member SuccRest : int -> BIso<'b, 'b>
 
   type AddBuilder<'b when 'b :> INum> =
     abstract member Add : BIso<'b * 'b, 'b * 'b>
@@ -42,12 +48,25 @@ module Builders =
     abstract member Compl : BIso<'b, 'b>
     abstract member Neg : BIso<'b, 'b>
 
+  type RepeatBuilder<'b when 'b :> INum> =
+    abstract member Repeat : int * (int -> BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
+
   type ISuccAddBuilder<'b when 'b :> INum> =
     inherit SuccBuilder<'b>
     inherit AddBuilder<'b>
     inherit NegBuilder<'b>
+    inherit RepeatBuilder<'b>
     inherit IBases
+
+  [<AutoOpen>]
+  module Mult =
+    type ISuccAddBuilder<'b when 'b :> INum> with
+      member b.Mult =
+        sym assoc >>> b.Repeat(0, fun i -> b.Repeat(0, fun j -> b.SuccRest (i + j))) >>> assoc
     
+  let inline (|SAB|) (s : #ISuccAddBuilder<_>) =
+    s, num s
+
   let private basesName (x : #ISuccAddBuilder<_>) =
     x.Bases
     |> Seq.map string
@@ -56,9 +75,12 @@ module Builders =
   type SuccDigit<'b when 'b :> IBase> = SuccDigit of 'b with
     interface ISuccAddBuilder<Digit<'b>> with
       member d.Succ = match d with SuccDigit b -> succ b
+      member d.SuccRest n = let d = d :> ISuccAddBuilder<_> in if n <= 0 then d.Succ else id
       member d.Add = match d with SuccDigit b -> rep' b (succ b)
       member d.Compl = match d with SuccDigit b -> compl b
       member d.Neg = let d = (d :> ISuccAddBuilder<_>) in d.Compl >>> d.Succ
+      member d.Repeat(i, makeFunc) = let (SuccDigit b), d = d, d :> ISuccAddBuilder<_>
+                                     rep' b (makeFunc i)
       member d.Bases = match d with SuccDigit b -> [b.Base] 
     
   type SuccNum<'b, 'n when 'b :> IBase and 'n :> INum> = SuccNum of 'b * ISuccAddBuilder<'n> with
@@ -66,8 +88,18 @@ module Builders =
       member s.Succ = 
         let (SuccNum (b, s')) = s
         let num = num (s :> ISuccAddBuilder<_>)
-        sym num >>> condLast b s'.Succ >>> (succ b &&& id) >>> num
+        (sym num >>> condLast b s'.Succ >>> (succ b &&& id) >>> num)
         |> group (sprintf "succ(%s)" <| basesName s)
+
+      member s.SuccRest n =
+        let (SuccNum (b, s')) = s
+        let s = (s :> ISuccAddBuilder<_>)
+        let num = num (s :> ISuccAddBuilder<_>)
+        if n <= 0 then
+          s.Succ
+        else
+          (sym num >>> (id &&& s'.SuccRest (n - 1)) >>> num)
+          |> group (sprintf "succRest(%d, %s)" n <| basesName s)
 
       member s.Add = 
         let (SuccNum (b, s')) = s
@@ -79,6 +111,16 @@ module Builders =
         let join = assoc >>> joinA >>> addB >>> assoc
         ((sym num &&& sym num) >>> splitDigits >>> (comm &&& s'.Add) >>> join >>> (id &&& num))
         |> group (sprintf "add(%s)" <| basesName s)
+
+      member s.Repeat (i, makeFunc) =
+        let (SuccNum (b, s')) = s
+        let s = (s :> ISuccAddBuilder<_>)
+        let num, repeat' = num s, s'.Repeat(i + 1, makeFunc)
+        let unpack = (id &&& sym num) >>> sym assoc
+        let rep1 = ((rep' b (makeFunc i) >>> comm) &&& id) >>> assoc
+        let repack = sym assoc >>> (comm &&& id) >>> assoc >>> (id &&& num)
+        (unpack >>> rep1 >>> (id &&& repeat') >>> repack)
+        |> group (sprintf "repeat(%d, %s)" i <| basesName s)
 
       member s.Compl =
         let (SuccNum (b, s')) = s
