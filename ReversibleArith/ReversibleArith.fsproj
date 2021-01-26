@@ -7,7 +7,9 @@
 
   <ItemGroup>
     <Compile Include="Iso.fs" />
-    <Compile Include="ReversibleArith.fs" />
+    <Compile Include="Num.fs" />
+    <Compile Include="NumIso.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
 </Project>

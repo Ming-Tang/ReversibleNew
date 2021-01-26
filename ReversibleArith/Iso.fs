@@ -1,4 +1,4 @@
-﻿module Iso
+﻿module ReversibleArith.Iso
 
 module Widths =
   open System
@@ -135,6 +135,7 @@ let rec symIsoToLaTeX depth si : string =
 type Iso<'a, 'b> = Iso of f : ('a -> 'b) * g : ('b -> 'a) * si : SymIso
 
 type BIso<'a, 'b> = unit -> Iso<'a, 'b>
+let inline LIso(f, g, s) : BIso<_, _> = fun () -> Iso(f, g, s)
 let inline BIso(f, g, s) : BIso<_, _> = fun () -> Iso(f, g, s)
 let inline (|BIso|) (x : BIso<_, _>) = match x() with Iso(f, g, s) -> f, g, s
 
@@ -156,15 +157,15 @@ let sym (BIso(a, b, s)) =
 
 let inline (~~) x = sym x
 
-let id() : Iso<'a, 'a> = 
+let id : BIso<'a, 'a> = fun _ ->
   Iso((fun x -> x), (fun x -> x), SFunc(FId <| Widths.getFrom<'a>()))
 
-let comm() : Iso<'a * 'b, 'b * 'a> = 
+let comm : BIso<'a * 'b, 'b * 'a> = fun _ ->
   let wa, wb = Widths.getFrom<'a>(), Widths.getFrom<'b>()
   Iso((fun (x, y) -> y, x), (fun (x, y) -> y, x), 
       SFunc(FComm <| Option.map2 (fun a b -> a, b) wa wb))
 
-let assoc() : Iso<('a * 'b) * 'c, _> = 
+let assoc : BIso<('a * 'b) * 'c, _> = fun _ ->
   let wa, wb, wc = Widths.getFrom<'a>(), Widths.getFrom<'b>(), Widths.getFrom<'c>()
   Iso((fun ((x, y), z) -> x, (y, z)), (fun (x, (y, z)) -> (x, y), z), 
       SFunc (FAssoc <| Option.map3 (fun a b c -> a, b, c) wa wb wc))
