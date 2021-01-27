@@ -44,33 +44,35 @@ module Builders =
   type AddBuilder<'b when 'b :> INum> =
     abstract member Add : BIso<'b * 'b, 'b * 'b>
 
-  type NegBuilder<'b when 'b :> INum> =
+  type ComplBuilder<'b when 'b :> INum> =
     abstract member Compl : BIso<'b, 'b>
-    abstract member Neg : BIso<'b, 'b>
 
-  type RepeatBuilder<'b when 'b :> INum> =
-    abstract member Repeat : int * (int -> BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
+  type FoldBuilder<'b when 'b :> INum> =
+    abstract member Fold : 's * ('s -> 's * BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
 
   type ISuccAddBuilder<'b when 'b :> INum> =
     inherit SuccBuilder<'b>
     inherit AddBuilder<'b>
-    inherit NegBuilder<'b>
-    inherit RepeatBuilder<'b>
+    inherit ComplBuilder<'b>
+    inherit FoldBuilder<'b>
     inherit IBases
-
-  [<AutoOpen>]
-  module Mult =
-    type ISuccAddBuilder<'b when 'b :> INum> with
-      member b.Mult =
-        sym assoc >>> b.Repeat(0, fun i -> b.Repeat(0, fun j -> b.SuccRest (i + j))) >>> assoc
-    
-  let inline (|SAB|) (s : #ISuccAddBuilder<_>) =
-    s, num s
 
   let private basesName (x : #ISuccAddBuilder<_>) =
     x.Bases
     |> Seq.map string
     |> String.concat ","
+
+  [<AutoOpen>]
+  module Extensions =
+    type ISuccAddBuilder<'b when 'b :> INum> with
+      member b.Repeat(i, makeIso) = 
+        b.Fold(0, fun i -> (i + 1, makeIso i))
+        |> group (sprintf "repeat(%A)" <| basesName b)
+
+      member b.Neg =
+        (b.Compl >>> b.Succ)
+        |> group (sprintf "neg(%s)" <| basesName b)
+    
 
   type SuccDigit<'b when 'b :> IBase> = SuccDigit of 'b with
     interface ISuccAddBuilder<Digit<'b>> with
@@ -78,9 +80,10 @@ module Builders =
       member d.SuccRest n = let d = d :> ISuccAddBuilder<_> in if n <= 0 then d.Succ else id
       member d.Add = match d with SuccDigit b -> rep' b (succ b)
       member d.Compl = match d with SuccDigit b -> compl b
-      member d.Neg = let d = (d :> ISuccAddBuilder<_>) in d.Compl >>> d.Succ
-      member d.Repeat(i, makeFunc) = let (SuccDigit b), d = d, d :> ISuccAddBuilder<_>
-                                     rep' b (makeFunc i)
+      member d.Fold(s, makeFunc) = 
+        let (SuccDigit b), d = d, d :> ISuccAddBuilder<_>
+        rep' b (snd <| makeFunc s)
+
       member d.Bases = match d with SuccDigit b -> [b.Base] 
     
   type SuccNum<'b, 'n when 'b :> IBase and 'n :> INum> = SuccNum of 'b * ISuccAddBuilder<'n> with
@@ -112,26 +115,22 @@ module Builders =
         ((sym num &&& sym num) >>> splitDigits >>> (comm &&& s'.Add) >>> join >>> (id &&& num))
         |> group (sprintf "add(%s)" <| basesName s)
 
-      member s.Repeat (i, makeFunc) =
+      member s.Fold (state, makeIso) =
         let (SuccNum (b, s')) = s
         let s = (s :> ISuccAddBuilder<_>)
-        let num, repeat' = num s, s'.Repeat(i + 1, makeFunc)
+        let state', iso = makeIso state
+        let num, repeat' = num s, s'.Fold(state', makeIso)
         let unpack = (id &&& sym num) >>> sym assoc
-        let rep1 = ((rep' b (makeFunc i) >>> comm) &&& id) >>> assoc
+        let rep1 = ((rep' b iso >>> comm) &&& id) >>> assoc
         let repack = sym assoc >>> (comm &&& id) >>> assoc >>> (id &&& num)
         (unpack >>> rep1 >>> (id &&& repeat') >>> repack)
-        |> group (sprintf "repeat(%d, %s)" i <| basesName s)
+        |> group (sprintf "fold(%A, %s)" state <| basesName s)
 
       member s.Compl =
         let (SuccNum (b, s')) = s
         let num = num (s :> ISuccAddBuilder<_>)
         (sym num >>> (compl b &&& s'.Compl) >>> num)
         |> group (sprintf "compl(%s)" <| basesName s)
-
-      member s.Neg =
-        let s = s :> ISuccAddBuilder<_>
-        (s.Compl >>> s.Succ)
-        |> group (sprintf "neg(%s)" <| basesName s)
 
       member s.Bases = 
         let (SuccNum (b, s')) = s
