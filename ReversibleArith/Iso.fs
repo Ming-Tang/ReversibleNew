@@ -179,4 +179,4 @@ let repConst n f =
     | i -> f >>> (repConst' (i - 1))
 
   repConst' n
-  |> group ("repConst(%d, _)")
+  |> group (sprintf "repConst(%d, \\ldots)" n)

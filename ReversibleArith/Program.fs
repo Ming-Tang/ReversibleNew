@@ -6,8 +6,13 @@ open NumIso
 [<EntryPoint>]
 let main argv =
   let s = succNum B10 (succNum B10 (succNum B10 (succDigit B10)))
-  let sn = (s :> SuccBuilder<_>).Succ
-  let addn = (s :> AddBuilder<_>).Add
+  let s' = succNum B8 (succDigit B6)
+  let s'' = succNum B4 (succNum B5 (succDigit B6))
+  let sn = (s :> ISuccAddBuilder<_>).Succ
+  let addn = (s :> ISuccAddBuilder<_>).Add
+  let pcn = (s :> ISuccAddBuilder<_>).PlusConst(47)
+
+  let multn = (s'' :> ISuccAddBuilder<_>).Mult''(s', s)
   printfn "%A" <| numberValue (Num(Digit(2, B10), Num(Digit(3, B10), Digit(4, B10))))
   printfn "%A" <| (add B10 <<| (Digit(7, B10), Digit(6, B10)))
   printfn "%A" <| (mult B10 <<| ((Digit(2, B10), Digit(3, B10)), Digit(4, B10)))
@@ -19,10 +24,20 @@ let main argv =
   printfn "%A" <| (addn <<| (d1237, d5499))
 
   printfn ""
+  printfn "# Successor"
+  printfn "$$%s$$" (showBIso None sn)
+
   printfn ""
-  printfn "%s" (showBIso None sn)
-  printfn "\\\\"
-  printfn "%s" (showBIso None addn)
+  printfn "# + Const"
+  printfn "$$%s$$" (showBIso None pcn)
+
+  printfn ""
+  printfn "# Add"
+  printfn "$$%s$$" (showBIso None addn)
+
+  printfn ""
+  printfn "# Mult"
+  printfn "$$%s$$" (showBIso None multn)
 
   // printfn ""
   // printfn ""

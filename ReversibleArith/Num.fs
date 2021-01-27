@@ -25,11 +25,15 @@ let inline baseValue (x : #INum) = x.Base
 type IBase =
   abstract member Base : int
 
+let inline getBase (b : #IBase) = b.Base
+
+let inline (|Base|) x = getBase x
+
 type MkBase = MkBase of int with
   interface IBase with
     member x.Base = match x with MkBase i -> i
   
-let mkBase x = MkBase x
+let inline mkBase x = MkBase x
 
 type B2 = B2 with
   interface IBase with member b.Base = 2
@@ -37,22 +41,26 @@ type B2 = B2 with
 type B3 = B3 with
   interface IBase with member b.Base = 3
 
+type B4 = B4 with
+  interface IBase with member b.Base = 4
+
 type B5 = B5 with
   interface IBase with member b.Base = 5
 
 type B6 = B6 with
   interface IBase with member b.Base = 6
 
+type B7 = B7 with
+  interface IBase with member b.Base = 7
+
 type B8 = B8 with
   interface IBase with member b.Base = 8
 
+type B9 = B9 with
+  interface IBase with member b.Base = 9
+
 type B10 = B10 with
   interface IBase with member b.Base = 10
-
-let inline getBase (x : #IBase) =
-  (x :> IBase).Base
-
-let inline (|Base|) x = getBase x
 
 type Digit<'b when 'b :> IBase> = Digit of digit : int * _base : 'b with
   member inline d.DecomposeDigit() =

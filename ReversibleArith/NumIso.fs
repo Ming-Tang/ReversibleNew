@@ -36,7 +36,7 @@ let rep (Base b) (BIso(f, g, s)) =
        lazy SPFunc(PFRep b, [s.Value]))
 
 /// Repeat f i times, with reversed arguments
-let rep' b bi = (comm >>> rep b bi >>> comm)
+let rep' b bi = comm >>> rep b bi >>> comm
 
 [<AutoOpen>]
 module Builders =
@@ -51,7 +51,7 @@ module Builders =
     abstract member Compl : BIso<'b, 'b>
 
   type FoldBuilder<'b when 'b :> INum> =
-    abstract member Fold : 's * ('s -> 's * BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
+    abstract member Fold : 's * (IBase -> 's -> 's * BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
 
   type ISuccAddBuilder<'b when 'b :> INum> =
     inherit SuccBuilder<'b>
@@ -70,12 +70,43 @@ module Builders =
   module Extensions =
     type ISuccAddBuilder<'b when 'b :> INum> with
       member b.Repeat(i, makeIso) = 
-        b.Fold(0, fun i -> (i + 1, makeIso i))
+        b.Fold(0, fun _ i -> (i + 1, makeIso i))
         |> group (sprintf "repeat(%A)" <| basesName b)
 
       member b.Neg =
         (b.Compl >>> b.Succ)
         |> group (sprintf "neg(%s)" <| basesName b)
+
+      /// a, b -> a + k * b, b
+      member b.AddMultiple k =
+        if k < 0 then
+          sym <| b.Fold(-k, fun (Base _b) s -> (s * _b, b.PlusConst(s)))
+        else
+          b.Fold(k, fun (Base _b) s -> (s * _b, b.PlusConst(s)))
+        |> group (sprintf "addMultiple(%d; %s)" k <| basesName b)
+
+      /// a, b -> a + k * b, b
+      member b.AddMultiple'(b' : #ISuccAddBuilder<'a>, k) =
+        if k < 0 then
+          sym <| b.Fold(-k, fun (Base _b) s -> (s * _b, b'.PlusConst(s)))
+        else
+          b.Fold(k, fun (Base _b) s -> (s * _b, b'.PlusConst(s)))
+        |> group (sprintf "addMultiple(%d; %s; %s)" k (basesName b') (basesName b))
+
+      /// (a, (b, c)) -> (a + b*c, (b, c))
+      member b.Mult =
+        (sym assoc >>> b.Fold(1, fun (Base _b) s -> (s * _b, b.AddMultiple(s))) >>> assoc)
+        |> group (sprintf "mult(%s)" <| basesName b)
+
+      /// (a, (b, c)) -> (a + b*c, (b, c))
+      member b.Mult'(b' : #ISuccAddBuilder<'c>) =
+        (sym assoc >>> b.Fold(1, fun (Base _b) s -> (s * _b, b'.AddMultiple(s))) >>> assoc)
+        |> group (sprintf "mult(%s; %s)" (basesName b') <| basesName b)
+
+      /// (a, (b, c)) -> (a + b*c, (b, c))
+      member b.Mult''(b' : #ISuccAddBuilder<'c>, b'' : #ISuccAddBuilder<'a>) =
+        (sym assoc >>> b.Fold(1, fun (Base _b) s -> (s * _b, b'.AddMultiple'(b'', s))) >>> assoc)
+        |> group (sprintf "mult(%s; %s; %s)" (basesName b'') (basesName b') <| basesName b)
 
   type SuccDigit<'b when 'b :> IBase> = SuccDigit of 'b with
     interface ISuccAddBuilder<Digit<'b>> with
@@ -85,7 +116,7 @@ module Builders =
       member d.Compl = match d with SuccDigit b -> compl b
       member d.Fold(s, makeFunc) = 
         let (SuccDigit b), d = d, d :> ISuccAddBuilder<_>
-        rep' b (snd <| makeFunc s)
+        rep' b (snd <| makeFunc b s)
 
       member d.PlusConst c =
         match d with SuccDigit ((Base b') as b) -> plusConst (((c % b') + b') % b') b
@@ -108,7 +139,7 @@ module Builders =
           s.Succ
         else
           (sym num >>> (id &&& s'.SuccRest (n - 1)) >>> num)
-          |> group (sprintf "succRest(%d, %s)" n <| basesName s)
+          |> group (sprintf "succRest(%d; %s)" n <| basesName s)
 
       member s.Add = 
         let (SuccNum (b, s')) = s
@@ -124,13 +155,13 @@ module Builders =
       member s.Fold (state, makeIso) =
         let (SuccNum (b, s')) = s
         let s = s :> ISuccAddBuilder<_>
-        let state', iso = makeIso state
+        let state', iso = makeIso b state
         let num, repeat' = num s, s'.Fold(state', makeIso)
         let unpack = (id &&& sym num) >>> sym assoc
         let rep1 = ((rep' b iso >>> comm) &&& id) >>> assoc
         let repack = sym assoc >>> (comm &&& id) >>> assoc >>> (id &&& num)
         (unpack >>> rep1 >>> (id &&& repeat') >>> repack)
-        |> group (sprintf "fold(%A, %s)" state <| basesName s)
+        |> group (sprintf "fold(%A; %s)" state <| basesName s)
 
       member s.Compl =
         let (SuccNum (b, s')) = s
@@ -147,7 +178,7 @@ module Builders =
           let d, q = ((c % b') + b') % b', c / b'
           let num, succ = num s, s.Succ
           (repConst d succ >>> sym num >>> (id &&& s'.PlusConst q) >>> num)
-          |> group (sprintf "plusConst(%d, %s)" c <| basesName s)
+          |> group (sprintf "plusConst(%d; %s)" c <| basesName s)
 
       member s.Bases = 
         let (SuccNum (b, s')) = s
