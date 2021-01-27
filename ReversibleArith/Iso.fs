@@ -35,6 +35,7 @@ type SymIsoFunc =
 | FId of int option
 | FNum of _bases : int list
 | FSucc of _base : int
+| FAddDigit of n : int * _base : int
 | FComm of (int * int) option
 | FAssoc of (int * int * int) option
 
@@ -57,6 +58,7 @@ let funcNameLaTeX =
     Seq.map string bs
     |> String.concat ", "
     |> sprintf "N_{%s}"
+  | FAddDigit(i, b) -> sprintf "A(%d)_{%d}" i b
   | FSucc b -> sprintf "S_{%d}" b
   | FComm None -> "C"
   | FComm (Some(a, b)) -> sprintf "C_{%d,%d}" a b
@@ -170,3 +172,11 @@ let assoc : BIso<('a * 'b) * 'c, _> = fun _ ->
       lazy (let wa, wb, wc = Widths.getFrom<'a>(), Widths.getFrom<'b>(), Widths.getFrom<'c>()
             SFunc (FAssoc <| Option.map3 (fun a b c -> a, b, c) wa wb wc)))
 
+let repConst n f =
+  let rec repConst' = 
+    function
+    | 0 -> id
+    | i -> f >>> (repConst' (i - 1))
+
+  repConst' n
+  |> group ("repConst(%d, _)")

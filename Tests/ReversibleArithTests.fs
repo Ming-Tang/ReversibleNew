@@ -102,7 +102,6 @@ module NumTests =
     let unmap = n.Unmap(n.Map n.NumberValue)
     sprintf "NumberValue=%A Unmap Map=%A" nv unmap @| (nv = unmap)
 
-
 [<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
 module IsoTests =
   let succNum0 = succDigit B10
@@ -110,11 +109,29 @@ module IsoTests =
 
   [<Property>]
   let ``succ n = n + 1 mod B``(Num1 n) =
-    let num = (n :> INum).NumberValue
+    let num, m = numberValue n, modValue n
     let succ = (succNum1 :> ISuccAddBuilder<_>).Succ
-    let expected = (num + 1) % modValue n
+    let expected = (num + 1) % m
     let actual = numberValue (succ <<| n)
     sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+
+  [<Property>]
+  let ``plusConst k n = n + k mod B single digih``(Num0 n, k : int) =
+    let num, m = numberValue n, modValue n
+    let plusConst = (succNum0 :> ISuccAddBuilder<_>).PlusConst k
+    let expected = (num + (k % m) + m) % m
+    let actual = numberValue (plusConst <<| n)
+    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+
+  [<Property>]
+  let ``plusConst k n = n + k mod B``(Num1 n, k : int) =
+    let num, m = numberValue n, modValue n
+    let plusConst = (succNum1 :> ISuccAddBuilder<_>).PlusConst k
+    (k + num >= 0) ==> lazy (
+      let expected = (num + (k % m) + m) % m
+      let actual = numberValue (plusConst <<| n)
+      sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    )
 
   [<Property>]
   let ``repeat k (succ n) = (n + k mod B, k)``(Num1 n, Num1 k) =

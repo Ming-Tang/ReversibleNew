@@ -84,6 +84,9 @@ type Digit<'b when 'b :> IBase> = Digit of digit : int * _base : 'b with
 let succDigit (Digit(d, (Base b as b'))) = Digit((d + 1) % b, b')
 let predDigit (Digit(d, (Base b as b'))) = Digit((d + b - 1) % b, b')
 
+let addDigit k (Digit(d, (Base b as b'))) = Digit((d + k) % b, b')
+let subDigit k (Digit(d, (Base b as b'))) = Digit((d + b - (k % b)) % b, b')
+
 let complDigit (Digit(d, (Base b as b'))) = Digit((b - d - 1) % b, b')
 
 let inline checkedPM a b c = Checked.(+) a (Checked.(*) b c)
