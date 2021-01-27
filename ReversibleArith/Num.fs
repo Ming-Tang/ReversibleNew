@@ -32,8 +32,6 @@ let inline (|Base|) x = getBase x
 type MkBase = MkBase of int with
   interface IBase with
     member x.Base = match x with MkBase i -> i
-  
-let inline mkBase x = MkBase x
 
 type B2 = B2 with
   interface IBase with member b.Base = 2
@@ -61,6 +59,20 @@ type B9 = B9 with
 
 type B10 = B10 with
   interface IBase with member b.Base = 10
+  
+let inline mkBase x = 
+  match x with
+  | 2 -> B2 :> IBase
+  | 3 -> B3 :> IBase
+  | 4 -> B4 :> IBase
+  | 5 -> B5 :> IBase
+  | 6 -> B6 :> IBase
+  | 7 -> B7 :> IBase
+  | 8 -> B8 :> IBase
+  | 9 -> B9 :> IBase
+  | 10 -> B10 :> IBase
+  | x when x <= 1 -> failwithf "mkBase: invalid base: %d" x
+  | _ -> MkBase x :> IBase
 
 type Digit<'b when 'b :> IBase> = Digit of digit : int * _base : 'b with
   member inline d.DecomposeDigit() =

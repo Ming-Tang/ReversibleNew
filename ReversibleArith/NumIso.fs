@@ -40,6 +40,15 @@ let rep' b bi = comm >>> rep b bi >>> comm
 
 [<AutoOpen>]
 module Builders =
+  open System.Reflection
+
+  type INumFromList =
+    abstract member NumFromList : int list -> INum
+
+  type INumFromList<'b when 'b :> INum> =
+    inherit INumFromList
+    abstract member NumFromList : int list -> 'b
+
   type SuccBuilder<'b when 'b :> INum> =
     abstract member Succ : BIso<'b, 'b>
     abstract member SuccRest : int -> BIso<'b, 'b>
@@ -53,13 +62,21 @@ module Builders =
   type FoldBuilder<'b when 'b :> INum> =
     abstract member Fold : 's * (IBase -> 's -> 's * BIso<'a, 'a>) -> BIso<'a * 'b, 'a * 'b>
 
+  type PlusConstBuilder<'b when 'b :> INum> =
+    abstract member PlusConst : int -> BIso<'b, 'b>
+
+  type ISuccAddBuilder =
+    inherit IBases
+    inherit INumFromList
+
   type ISuccAddBuilder<'b when 'b :> INum> =
     inherit SuccBuilder<'b>
     inherit AddBuilder<'b>
     inherit ComplBuilder<'b>
     inherit FoldBuilder<'b>
-    abstract member PlusConst : int -> BIso<'b, 'b>
-    inherit IBases
+    inherit PlusConstBuilder<'b>
+    inherit INumFromList<'b>
+    inherit ISuccAddBuilder
 
   let private basesName (x : #ISuccAddBuilder<_>) =
     x.Bases
@@ -122,7 +139,17 @@ module Builders =
         match d with SuccDigit ((Base b') as b) -> plusConst (((c % b') + b') % b') b
 
       member d.Bases = match d with SuccDigit b -> [b.Base] 
-    
+
+      member d.NumFromList xs =
+        let (SuccDigit b) = d
+        let m = b.Base
+        match xs with
+        | [x] -> Digit(((x % m) + m) % m, b)
+        | _ -> failwith "NumFromList: must have length of 1"
+
+    interface INumFromList with
+      member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
+
   type SuccNum<'b, 'n when 'b :> IBase and 'n :> INum> = SuccNum of 'b * ISuccAddBuilder<'n> with
     interface ISuccAddBuilder<Num<'b, 'n>> with
       member s.Succ = 
@@ -184,6 +211,19 @@ module Builders =
         let (SuccNum (b, s')) = s
         [b.Base] @ s'.Bases
 
+      member s.NumFromList xs =
+        let (SuccNum (b, s')) = s
+        match xs with
+        | [] -> failwith "NumFromList: must be nonempty"
+        | x :: xs -> 
+          let m = b.Base
+          Num(Digit(((x % m) + m) % m, b),
+              s'.NumFromList xs)
+
+    interface INumFromList with
+      member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
+
+
   let succDigit (b : 't when 't :> IBase) = 
     let sd = SuccDigit b
     Widths.add typeof<Digit<'t>> (getBase b)
@@ -195,29 +235,23 @@ module Builders =
     Widths.add (typeof<Num<'b, 'n>>) (getBases sn |> List.sum)
     sn
 
-  type Builder() =
-    static member inline Build< ^b when ^b :> IBase>(d : Digit< ^b>) : SuccDigit< ^b> =
-      SuccDigit (snd <| d.DecomposeDigit())
+  let private succNumCtor tb tn = 
+    let td = typedefof<SuccNum<IBase, INum>>.MakeGenericType(tb, tn)
+    fun a b -> 
+      td.InvokeMember(
+        "NewSuccNum", BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.InvokeMethod, 
+        null, null, [| a; b |])
 
-    static member inline Build< ^t, ^n, ^b, ^r 
-        when ^b :> IBase and ^n :> INum and ^t : (static member Build : ^n -> ^r) and ^r :> ISuccAddBuilder< ^n>
-      >(n : Num< ^b, ^n>) =
-      let d, rest = n.DecomposeNum()
-      let res = (( ^t) : (static member Build : ^n -> ^r ) rest)
-      SuccNum(snd (d.DecomposeDigit()), res)
-
-  let inline build'< ^t, ^d, ^r when ^t : (static member Build : ^d -> ^r)> (d : ^d) : ^r =
-    ( ^t : (static member Build : ^d -> ^r) d)
-
-  //let test1 = build'<Builder, _, _> (Digit(3, B10))
-  //let test2 = build'<Builder, _, _> (Num(Digit(5, B10), Digit(3, B10)))
-  // build'<Builder, _, _> (succNum B10 (succNum B2 (succDigit B10)))
-
-  let rec fromList xs : ISuccAddBuilder<INum> =
+  let rec succFromList xs : ISuccAddBuilder =
     match xs with
     | [] -> failwith "succFromList: empty"
-    | [x] -> SuccDigit(mkBase x) |> box |> unbox
-    | x :: xs -> SuccNum(mkBase x, fromList xs) |> box |> unbox
+    | [x] -> SuccDigit(mkBase x) :> _
+    | x :: xs -> 
+      let res = succFromList xs
+      let args = res.GetType().GetInterface(typedefof<ISuccAddBuilder<INum>>.Name).GetGenericArguments()
+      let b = mkBase x
+      let ctor = succNumCtor (b.GetType()) args.[0]
+      downcast (ctor b res)
 
 let add b = rep' b (succ b) |> group (sprintf "add(%d)" b.Base)
 let mult b = rep' b (add b) |> group (sprintf "mult(%d)" b.Base)

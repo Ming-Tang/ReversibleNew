@@ -1,4 +1,5 @@
 ﻿module ReversibleArith.Iso
+open System.Text.RegularExpressions
 
 module Widths =
   open System
@@ -44,7 +45,8 @@ type SymIsoPFunc =
 | PFCond of value : int * _base : int
 | PFCondLast of _base : int
 
-let funcNameLaTeX =
+let private patSub = new Regex(@"_\{.+\}$")
+let funcNameLaTeX' =
   function
   | FId None -> sprintf "I"
   | FId (Some n) -> sprintf "I_{%d}" n
@@ -65,11 +67,15 @@ let funcNameLaTeX =
   | FAssoc None -> "A"
   | FAssoc (Some(a, b, c)) -> sprintf "A_{(%d,%d),%d}" a b c
 
-let pFuncNameLaTeX =
+let funcNameLaTeX x = patSub.Replace(funcNameLaTeX' x, "")
+  
+let pFuncNameLaTeX' =
   function
   | PFRep b -> sprintf "R_{%d}" b
   | PFCond (i, b) -> sprintf "C_{%d,%d}" i b
   | PFCondLast b -> sprintf "CL_{%d}" b
+
+let pFuncNameLaTeX x = patSub.Replace(pFuncNameLaTeX' x, "")
 
 type SymIso =
 | SGroup of string * SymIso
@@ -131,7 +137,7 @@ let rec symIsoToLaTeX depth si : string =
     xs 
     |> flattenCompose
     |> List.map recurse
-    |> String.concat " \\cdot "
+    |> String.concat " " // " \\cdot "
     |> sprintf " %s "
 
 type Iso<'a, 'b> = Iso of f : ('a -> 'b) * g : ('b -> 'a) * si : SymIso Lazy

@@ -5,6 +5,9 @@ open NumIso
 
 [<EntryPoint>]
 let main argv =
+  let sfl = succFromList [16; 8; 3; 4; 5]
+  printfn "%A %A" sfl (sfl.NumFromList([3; 5; 1; 0; 2]))
+
   let s = succNum B10 (succNum B10 (succNum B10 (succDigit B10)))
   let s' = succNum B8 (succDigit B6)
   let s'' = succNum B4 (succNum B5 (succDigit B6))
