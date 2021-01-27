@@ -10,34 +10,82 @@ type Num0 = Num0 of Digit<B10>
 type Num1 = Num1 of Num<B6, Num<B10, Digit<B8>>>
 type Num2 = Num2 of Num<B9, Num<B5, Num<B6, Digit<B7>>>>
 
+type SAB1 = SAB1 of ISuccAddBuilder * INum
+type SAB2 = SAB2 of ISuccAddBuilder * INum * INum
+type SAB3 = SAB3 of ISuccAddBuilder * INum * INum * INum
+
 let genBase i =
   Gen.choose (2, max 2 i) 
   |> Gen.map mkBase
 
-let rec listGen xs =
+let genWithinBase b = Gen.choose (0, b - 1)
+
+let rec genFromGens xs =
   gen {
     match xs with
     | [] -> return []
     | x :: xs ->
       let! x' = x
-      let! xs' = listGen xs
+      let! xs' = genFromGens xs
       return x' :: xs'
   }
 
-let rec listWithProd n =
+let rec genListWithProd n =
   gen {
     if n <= 2 then
       return [2]
     else
       let! a = Gen.choose (2, min n 32)
-      let! xs = listWithProd (n / a)
+      let! xs = genListWithProd (n / a)
       return a :: xs
   }
+
+let genSuccAddBuilder =
+  Gen.sized <| fun s ->
+    genListWithProd s
+    |> Gen.filter (fun x -> 
+      let n = List.length x
+      n >= 1 && n <= 4 && List.reduce (*) x < s
+    )
+    |> Gen.map (fun l -> l, succFromList l)
 
 type Generators =
   static member Base() =
     Gen.sized genBase
     |> Arb.fromGen
+
+  static member SuccAddBuilder() =
+    genSuccAddBuilder
+    |> Gen.map snd
+    |> Arb.fromGen
+
+  static member SAB1() =
+    gen {
+      let! bs, sab = genSuccAddBuilder
+      let! ds = genFromGens (List.map genWithinBase bs)
+      return SAB1(sab, sab.NumFromList(ds))
+    }
+    |> Arb.fromGen
+
+  static member SAB2() =
+    gen {
+      let! bs, sab = genSuccAddBuilder
+      let! ds1 = genFromGens (List.map genWithinBase bs)
+      let! ds2 = genFromGens (List.map genWithinBase bs)
+      return SAB2(sab, sab.NumFromList(ds1), sab.NumFromList(ds2))
+    }
+    |> Arb.fromGen
+
+  static member SAB3() =
+    gen {
+      let! bs, sab = genSuccAddBuilder
+      let! ds1 = genFromGens (List.map genWithinBase bs)
+      let! ds2 = genFromGens (List.map genWithinBase bs)
+      let! ds3 = genFromGens (List.map genWithinBase bs)
+      return SAB3(sab, sab.NumFromList(ds1), sab.NumFromList(ds2), sab.NumFromList(ds3))
+    }
+    |> Arb.fromGen
+
 
   static member Num0() =
     gen {
@@ -74,9 +122,9 @@ type Generators =
   static member Num() =
     Gen.sized (fun n -> 
       gen {
-        let! bs' = listWithProd n
+        let! bs' = genListWithProd n
         let bs = List.map mkBase bs'
-        let! ds = listGen <| List.map (fun n -> Gen.choose (0, getBase n - 1)) bs
+        let! ds = genFromGens <| List.map (fun n -> Gen.choose (0, getBase n - 1)) bs
         return
           List.zip ds bs
           |> Seq.fold (fun o (d, b) -> 
@@ -116,6 +164,9 @@ module NumTests =
     let unmap = n.Unmap(n.Map n.NumberValue)
     sprintf "NumberValue=%A Unmap Map=%A" nv unmap @| (nv = unmap)
 
+let inline (.=.) expected actual =
+  sprintf "%A = %A" expected actual @| (expected = actual)
+
 [<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
 module IsoTests =
   let succNum0 = succDigit B10
@@ -128,7 +179,7 @@ module IsoTests =
     let succ = (succNum1 :> ISuccAddBuilder<_>).Succ
     let expected = (num + 1) % m
     let actual = numberValue (succ <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``plusConst k n = n + k mod B: single digit``(Num0 n, k : int) =
@@ -136,7 +187,7 @@ module IsoTests =
     let plusConst = (succNum0 :> ISuccAddBuilder<_>).PlusConst k
     let expected = (num + (k % m) + m) % m
     let actual = numberValue (plusConst <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``plusConst k n = n + k mod B``(Num1 n, k : int) =
@@ -144,7 +195,7 @@ module IsoTests =
     let plusConst = (succNum1 :> ISuccAddBuilder<_>).PlusConst k
     let expected = (num + (k % m) + m) % m
     let actual = numberValue (plusConst <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``repeat k (succ n) = (n + k mod B, k)``(Num1 n, Num1 k) =
@@ -154,7 +205,7 @@ module IsoTests =
     let expected = (num + numberValue k) % modValue n, numberValue k
     let p, q = repSucc <<| (n, k)
     let actual = numberValue p, numberValue q
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``succRest 1 n = n + b0 mod B``(Num1 n) =
@@ -163,7 +214,7 @@ module IsoTests =
     let succ2 = (succNum1 :> ISuccAddBuilder<_>).SuccRest 2
     let expected = ((num + 6) % modValue n, (num + 6 * 10) % modValue n)
     let actual = numberValue (succ1 <<| n), numberValue (succ2 <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``pred n = n - 1 mod B``(Num1 n) =
@@ -171,7 +222,7 @@ module IsoTests =
     let pred = sym (succNum1 :> ISuccAddBuilder<_>).Succ
     let expected = (num + modValue n - 1) % modValue n
     let actual = numberValue (pred <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``addMultiple k (m, n) = (m + k * n mod B, n)``(Num1 m, Num1 n, k : int) =
@@ -180,7 +231,7 @@ module IsoTests =
     let expected = (num1 + ((k * num2 + b) % b) + b) % b, num2
     let actual1, actual2 = add <<| (m, n)
     let actual = numberValue actual1, numberValue actual2
-    sprintf "%A : %A = %A" (num1, k, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``addMultiple k (m, n) = (m + k * n mod B, n): different bases (B = base M)``(Num2 m, Num1 n, k : int) =
@@ -189,7 +240,7 @@ module IsoTests =
     let expected = (num1 + ((k * num2 + b) % b) + b) % b, num2
     let actual1, actual2 = add <<| (m, n)
     let actual = numberValue actual1, numberValue actual2
-    sprintf "%A : %A = %A" (num1, k, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``add(m, n) = (m + n mod B, n)``(Num1 m, Num1 n) =
@@ -198,7 +249,7 @@ module IsoTests =
     let expected = (num1 + num2) % modValue n, num2
     let actual1, actual2 = add <<| (m, n)
     let actual = numberValue actual1, numberValue actual2
-    sprintf "%A : %A = %A" (num1, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``sub(m, n) = (m - n mod B, n)``(Num1 m, Num1 n) =
@@ -207,14 +258,14 @@ module IsoTests =
     let expected = (num1 - num2 + b) % b, num2
     let actual1, actual2 = add <<| (m, n)
     let actual = numberValue actual1, numberValue actual2
-    sprintf "%A : %A = %A" (num1, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``neg (neg n) = n``(Num1 n) =
     let neg = sym (succNum1 :> ISuccAddBuilder<_>).Neg
     let expected = numberValue n
     let actual = numberValue ((neg >>> neg) <<| n)
-    sprintf "%A : %A = %A" num expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``fst sub(m, n) = fst add(m, neg(n)): single digit``(Num0 m, Num0 n) =
@@ -224,7 +275,7 @@ module IsoTests =
     let neg = (succNum0 :> ISuccAddBuilder<_>).Neg
     let expected = sub <<| (m, n)
     let actual = ((id &&& neg) >>> add >>> (id &&& neg)) <<| (m, n)
-    sprintf "%A : %A = %A" (num1, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``fst sub(m, n) = fst add(m, neg(n))``(Num1 m, Num1 n) =
@@ -234,7 +285,7 @@ module IsoTests =
     let neg = (succNum1 :> ISuccAddBuilder<_>).Neg
     let expected = sub <<| (m, n)
     let actual = ((id &&& neg) >>> add >>> (id &&& neg)) <<| (m, n)
-    sprintf "%A : %A = %A" (num1, num2) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``mult(a, m, n) = (a + m * n mod B, m, n)``(Num1 a, Num1 m, Num1 n) =
@@ -243,7 +294,7 @@ module IsoTests =
     let expected = (num0 + num1 * num2) % modValue n, (num1, num2)
     let actual0, (actual1, actual2) = mult <<| (a, (m, n))
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
-    sprintf "%A : %A = %A" (num0, (num1, num2)) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases``(Num1 a, Num1 m, Num2 n) =
@@ -252,7 +303,7 @@ module IsoTests =
     let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
     let actual0, (actual1, actual2) = mult <<| (a, (m, n))
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
-    sprintf "%A : %A = %A" (num0, (num1, num2)) expected actual @| (expected = actual)
+    expected .=. actual
 
   [<Property>]
   let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases 2``(Num1 a, Num2 m, Num2 n) =
@@ -261,5 +312,5 @@ module IsoTests =
     let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
     let actual0, (actual1, actual2) = mult <<| (a, (m, n))
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
-    sprintf "%A : %A = %A" (num0, (num1, num2)) expected actual @| (expected = actual)
+    expected .=. actual
 
