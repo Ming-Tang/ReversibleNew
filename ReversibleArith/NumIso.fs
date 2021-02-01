@@ -1,5 +1,6 @@
 ﻿module ReversibleArith.NumIso
 open Iso
+open Iso.Operators
 open Num
 
 /// Digit complement
@@ -68,6 +69,8 @@ module Builders =
   type ISuccAddBuilder =
     inherit IBases
     inherit INumFromList
+    abstract member Succ' : BIso<INum, INum>
+    abstract member SuccRest' : int -> BIso<INum, INum>
 
   type ISuccAddBuilder<'b when 'b :> INum> =
     inherit SuccBuilder<'b>
@@ -138,14 +141,17 @@ module Builders =
       member d.PlusConst c =
         match d with SuccDigit ((Base b') as b) -> plusConst (((c % b') + b') % b') b
 
-      member d.Bases = match d with SuccDigit b -> [b.Base] 
-
       member d.NumFromList xs =
         let (SuccDigit b) = d
         let m = b.Base
         match xs with
         | [x] -> Digit(((x % m) + m) % m, b)
         | _ -> failwith "NumFromList: must have length of 1"
+
+    interface ISuccAddBuilder with
+      member d.Bases = match d with SuccDigit b -> [b.Base] 
+      member d.Succ' = cast >>> (d :> ISuccAddBuilder<_>).Succ >>> cast
+      member d.SuccRest' i = cast >>> (d :> ISuccAddBuilder<_>).SuccRest(i) >>> cast
 
     interface INumFromList with
       member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
@@ -207,10 +213,6 @@ module Builders =
           (repConst d succ >>> sym num >>> (id &&& s'.PlusConst q) >>> num)
           |> group (sprintf "plusConst(%d; %s)" c <| basesName s)
 
-      member s.Bases = 
-        let (SuccNum (b, s')) = s
-        [b.Base] @ s'.Bases
-
       member s.NumFromList xs =
         let (SuccNum (b, s')) = s
         match xs with
@@ -219,6 +221,15 @@ module Builders =
           let m = b.Base
           Num(Digit(((x % m) + m) % m, b),
               s'.NumFromList xs)
+
+    interface ISuccAddBuilder with
+
+      member s.Bases = 
+        let (SuccNum (b, s')) = s
+        [b.Base] @ s'.Bases
+
+      member s.Succ' = cast >>> (s :> ISuccAddBuilder<_>).Succ >>> cast
+      member s.SuccRest' i = cast >>> (s :> ISuccAddBuilder<_>).SuccRest(i) >>> cast
 
     interface INumFromList with
       member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _

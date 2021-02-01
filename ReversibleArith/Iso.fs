@@ -149,21 +149,26 @@ let inline (|BIso|) (x : BIso<_, _>) = match x() with Iso(f, g, s) -> f, g, s
 
 let group n (BIso(a, b, s)) = BIso(a, b, lazy SGroup(n, s.Value))
 
+let getSymIso (BIso(_, _, s)) = s.Value
+
 // let showBIso (BIso(_, _, s)) = (sprintf "%A" <| symIsoToObj s).Replace("\"", "")
 let showBIso n (BIso(_, _, s)) = sprintf "%s" <| symIsoToLaTeX n s.Value
 let showBIso' (BIso(_, _, s)) = sprintf "%A" s.Value
 
-let (<<|) (BIso(f, _, _)) x = f x
-let (>>>) (BIso(f, f', fs)) (BIso(g, g', gs)) = 
-  BIso(f >> g, g' >> f', lazy SCompose [fs.Value; gs.Value])
-
-let (&&&) (BIso(f, f', fs)) (BIso(g, g', gs)) =
-  BIso((fun (x, y) -> (f x, g y)), (fun (x, y) -> (f' x, g' y)), lazy SPair(fs.Value, gs.Value))
-
 let sym (BIso(a, b, s)) =
   BIso(b, a, lazy SSym s.Value)
 
-let inline (~~) x = sym x
+module Operators =
+  let (<<|) (BIso(f, _, _)) x = f x
+  let (>>>) (BIso(f, f', fs)) (BIso(g, g', gs)) = 
+    BIso(f >> g, g' >> f', lazy SCompose [fs.Value; gs.Value])
+
+  let (&&&) (BIso(f, f', fs)) (BIso(g, g', gs)) =
+    BIso((fun (x, y) -> (f x, g y)), (fun (x, y) -> (f' x, g' y)), lazy SPair(fs.Value, gs.Value))
+
+  let inline (~~) x = sym x
+
+open Operators
 
 let id : BIso<'a, 'a> = fun _ ->
   Iso((fun x -> x), (fun x -> x), lazy SFunc(FId <| Widths.getFrom<'a>()))
@@ -186,3 +191,7 @@ let repConst n f =
 
   repConst' n
   |> group (sprintf "repConst(%d, \\ldots)" n)
+
+let cast : BIso<'a, 'b> = fun _ ->
+  Iso(box >> unbox, box >> unbox, lazy SFunc(FId None))
+

@@ -1,5 +1,6 @@
 ﻿module ReversibleArith.Main
 open Iso
+open Iso.Operators
 open Num
 open NumIso
 

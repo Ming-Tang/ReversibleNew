@@ -8,7 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ReversibleNetworkTests.fs" />
     <Compile Include="ReversibleNewTests.fs" />
+    <Compile Include="BilliardMachineTests.fs" />
     <Compile Include="ReversibleArithTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -28,7 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BilliardMachine\BilliardMachine.fsproj" />
     <ProjectReference Include="..\ReversibleArith\ReversibleArith.fsproj" />
+    <ProjectReference Include="..\ReversibleNetwork\ReversibleNetwork.fsproj" />
     <ProjectReference Include="..\ReversibleNew\ReversibleNew.fsproj" />
   </ItemGroup>
 

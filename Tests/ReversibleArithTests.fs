@@ -4,6 +4,7 @@ open ReversibleArith.Num
 open FsCheck
 open FsCheck.Xunit
 open ReversibleArith.Iso
+open ReversibleArith.Iso.Operators
 open ReversibleArith.NumIso
 
 type Num0 = Num0 of Digit<B10>
@@ -45,7 +46,7 @@ let genSuccAddBuilder =
     genListWithProd s
     |> Gen.filter (fun x -> 
       let n = List.length x
-      n >= 1 && n <= 4 && List.reduce (*) x < s
+      n >= 1 && n <= 8
     )
     |> Gen.map (fun l -> l, succFromList l)
 
@@ -314,3 +315,141 @@ module IsoTests =
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
     expected .=. actual
 
+[<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
+module IsoTestsSAB =
+  [<Property>]
+  let ``succ n = n + 1 mod B``(SAB1(sab, n)) =
+    let num, m = numberValue n, modValue n
+    let succ = sab.Succ'
+    let expected = (num + 1) % m
+    let actual = numberValue (succ <<| n)
+    expected .=. actual
+
+#if FALSE
+  [<Property>]
+  let ``plusConst k n = n + k mod B: single digit``(SAB1(sab, n), k : int) =
+    let num, m = numberValue n, modValue n
+    let plusConst = sab.PlusConst k
+    let expected = (num + (k % m) + m) % m
+    let actual = numberValue (plusConst <<| n)
+    expected .=. actual
+
+  [<Property>]
+  let ``repeat k (succ n) = (n + k mod B, k)``(SAB2(sab, n, k)) =
+    let num = numberValue n
+    let sb = sab
+    let repSucc = sb.Repeat(0, sb.SuccRest)
+    let expected = (num + numberValue k) % modValue n, numberValue k
+    let p, q = repSucc <<| (n, k)
+    let actual = numberValue p, numberValue q
+    expected .=. actual
+
+  [<Property>]
+  let ``succRest 1 n = n + b0 mod B``(SAB1(sab, n)) =
+    let num = numberValue n
+    let succ1 = sab.SuccRest 1
+    let succ2 = sab.SuccRest 2
+    let expected = ((num + 6) % modValue n, (num + 6 * 10) % modValue n)
+    let actual = numberValue (succ1 <<| n), numberValue (succ2 <<| n)
+    expected .=. actual
+#endif
+
+  [<Property>]
+  let ``pred n = n - 1 mod B``(SAB1(sab, n)) =
+    let num = numberValue n
+    let pred = sym sab.Succ'
+    let expected = (num + modValue n - 1) % modValue n
+    let actual = numberValue (pred <<| n)
+    expected .=. actual
+
+#if FALSE
+  [<Property>]
+  let ``addMultiple k (m, n) = (m + k * n mod B, n)``(SAB2(sab, m, n), k : int) =
+    let num1, num2, b = numberValue m, numberValue n, modValue m
+    let add = sab.AddMultiple k
+    let expected = (num1 + ((k * num2 + b) % b) + b) % b, num2
+    let actual1, actual2 = add <<| (m, n)
+    let actual = numberValue actual1, numberValue actual2
+    expected .=. actual
+
+  [<Property>]
+  let ``addMultiple k (m, n) = (m + k * n mod B, n): different bases (B = base M)``(SAB1(sab1, m), SAB1(sab2, n), k : int) =
+    let num1, num2, b = numberValue m, numberValue n, modValue m
+    let add = sab1.AddMultiple'(sab2, k)
+    let expected = (num1 + ((k * num2 + b) % b) + b) % b, num2
+    let actual1, actual2 = add <<| (m, n)
+    let actual = numberValue actual1, numberValue actual2
+    expected .=. actual
+
+  [<Property>]
+  let ``add(m, n) = (m + n mod B, n)``(SAB2(sab, m, n)) =
+    let num1, num2 = numberValue m, numberValue n
+    let add = sab.Add
+    let expected = (num1 + num2) % modValue n, num2
+    let actual1, actual2 = add <<| (m, n)
+    let actual = numberValue actual1, numberValue actual2
+    expected .=. actual
+
+  [<Property>]
+  let ``sub(m, n) = (m - n mod B, n)``(SAB2(sab, m, n)) =
+    let num1, num2, b = numberValue m, numberValue n, modValue m
+    let add = sym sab.Add
+    let expected = (num1 - num2 + b) % b, num2
+    let actual1, actual2 = add <<| (m, n)
+    let actual = numberValue actual1, numberValue actual2
+    expected .=. actual
+
+  [<Property>]
+  let ``neg (neg n) = n``(SAB1(sab, n)) =
+    let neg = sym sab.Neg
+    let expected = numberValue n
+    let actual = numberValue ((neg >>> neg) <<| n)
+    expected .=. actual
+
+  [<Property>]
+  let ``fst sub(m, n) = fst add(m, neg(n)): single digit``(SAB2(sab, m, n)) =
+    let num1, num2 = numberValue m, numberValue n
+    let add = sab.Add
+    let sub = sym sab.Add
+    let neg = sab.Neg
+    let expected = sub <<| (m, n)
+    let actual = ((id &&& neg) >>> add >>> (id &&& neg)) <<| (m, n)
+    expected .=. actual
+
+  [<Property>]
+  let ``fst sub(m, n) = fst add(m, neg(n))``(SAB2(sab, m, n)) =
+    let num1, num2 = numberValue m, numberValue n
+    let add = sab.Add
+    let sub = sym sab.Add
+    let neg = sab.Neg
+    let expected = sub <<| (m, n)
+    let actual = ((id &&& neg) >>> add >>> (id &&& neg)) <<| (m, n)
+    expected .=. actual
+
+  [<Property>]
+  let ``mult(a, m, n) = (a + m * n mod B, m, n)``(SAB3(sab, a, m, n)) =
+    let num0, num1, num2 = numberValue a, numberValue m, numberValue n
+    let mult = sab.Mult
+    let expected = (num0 + num1 * num2) % modValue n, (num1, num2)
+    let actual0, (actual1, actual2) = mult <<| (a, (m, n))
+    let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
+    expected .=. actual
+
+  [<Property>]
+  let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases``(SAB2(sab1, a, m), SAB1(sab2, n)) =
+    let num0, num1, num2 = numberValue a, numberValue m, numberValue n
+    let mult = sab2.Mult'(sab1)
+    let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
+    let actual0, (actual1, actual2) = mult <<| (a, (m, n))
+    let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
+    expected .=. actual
+
+  [<Property>]
+  let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases 2``(SAB1(sab1, a), SAB2(sab2, m, n)) =
+    let num0, num1, num2 = numberValue a, numberValue m, numberValue n
+    let mult = sab2.Mult''(succNum2, succNum1)
+    let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
+    let actual0, (actual1, actual2) = mult <<| (a, (m, n))
+    let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
+    expected .=. actual
+#endif

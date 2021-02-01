@@ -9,7 +9,11 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tests", "..\Tests\Tests.fsp
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "PiLang", "..\PiLang\PiLang.fsproj", "{7BA47CFF-3BF9-4FB1-9807-B956D3251E31}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ReversibleArith", "..\ReversibleArith\ReversibleArith.fsproj", "{63F4F07D-1619-4C62-AB78-F3CD7606F7FE}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "ReversibleArith", "..\ReversibleArith\ReversibleArith.fsproj", "{63F4F07D-1619-4C62-AB78-F3CD7606F7FE}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "BilliardMachine", "..\BilliardMachine\BilliardMachine.fsproj", "{64F18BFF-2ACB-4B77-88B2-3514DD37638C}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ReversibleNetwork", "..\ReversibleNetwork\ReversibleNetwork.fsproj", "{DB771A7E-E21D-46D9-8166-E2B6D1C8FEAB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +37,14 @@ Global
 		{63F4F07D-1619-4C62-AB78-F3CD7606F7FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{63F4F07D-1619-4C62-AB78-F3CD7606F7FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{63F4F07D-1619-4C62-AB78-F3CD7606F7FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64F18BFF-2ACB-4B77-88B2-3514DD37638C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64F18BFF-2ACB-4B77-88B2-3514DD37638C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64F18BFF-2ACB-4B77-88B2-3514DD37638C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64F18BFF-2ACB-4B77-88B2-3514DD37638C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB771A7E-E21D-46D9-8166-E2B6D1C8FEAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB771A7E-E21D-46D9-8166-E2B6D1C8FEAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB771A7E-E21D-46D9-8166-E2B6D1C8FEAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB771A7E-E21D-46D9-8166-E2B6D1C8FEAB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

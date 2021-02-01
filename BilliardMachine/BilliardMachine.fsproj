@@ -6,10 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Iso.fs" />
-    <Compile Include="Num.fs" />
-    <Compile Include="NumIso.fs" />
-    <Compile Include="ReversibleArithMain.fs" />
+    <Compile Include="BilliardMachine.fs" />
+    <Compile Include="Synthesis.fs" />
+    <Compile Include="BilliardMachineMain.fs" />
   </ItemGroup>
 
 </Project>

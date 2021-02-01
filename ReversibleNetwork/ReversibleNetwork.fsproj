@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ReversibleNetwork.fs" />
+    <Compile Include="Network.fs" />
+    <Compile Include="Builders.fs" />
+    <Compile Include="FromIso.fs" />
+    <Compile Include="ReversibleNetworkMain.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ReversibleArith\ReversibleArith.fsproj" />
+  </ItemGroup>
+
+</Project>
