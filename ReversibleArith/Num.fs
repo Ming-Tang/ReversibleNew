@@ -18,6 +18,13 @@ type INum =
   inherit IBases
   inherit IMapUnmap
 
+type IFromDigits<'a when 'a :> INum> =
+  abstract member FromDigits : int list -> 'a
+
+type INum<'a when 'a :> INum> =
+  inherit INum
+  inherit IFromDigits<'a>
+
 let inline modValue x = (x :> INum).Mod
 let inline numberValue (x : #INum) = x.NumberValue
 let inline baseValue (x : #INum) = x.Base
@@ -78,6 +85,10 @@ type Digit<'b when 'b :> IBase> = Digit of digit : int * _base : 'b with
   member inline d.DecomposeDigit() =
     match d with Digit(d, b) -> d, b
 
+  interface IFromDigits<Digit<'b>> with
+    member d.FromDigits ds =
+      match d with Digit(_, b) -> Digit(ds.[0] % getBase b, b)
+
   interface INum with
     member d.NumberValue =
       match d with Digit(d, _) -> d
@@ -115,6 +126,13 @@ type Num<'b, 'n when 'b :> IBase and 'n :> INum> = Num of Digit<'b> * 'n with
   member inline d.DecomposeNum() =
     match d with Num(d, b) -> d, b
 
+  interface IFromDigits<Num<'b, 'n>> with
+    member n.FromDigits ds =
+      match n, ds with 
+      | Num(x, y), i :: ds -> 
+        Num((x :> IFromDigits<_>).FromDigits([i]), (unbox (box y) :> IFromDigits<'n>).FromDigits ds)
+      | _ -> failwith "Num.FromDigits: not enough digits"
+
   interface INum with
     member n.Bases =
       match n with
@@ -122,7 +140,7 @@ type Num<'b, 'n when 'b :> IBase and 'n :> INum> = Num of Digit<'b> * 'n with
 
     member n.Digits =
       match n with
-      | Num(d, ds) -> [baseValue d] @ (ds :> INum).Digits
+      | Num(d, ds) -> [numberValue d] @ (ds :> INum).Digits
 
     member n.NumberValue =
       match n with 
@@ -153,4 +171,22 @@ type Num<'b, 'n when 'b :> IBase and 'n :> INum> = Num of Digit<'b> * 'n with
 
 let unNum (Num(a, b)) = a, b
 let mkNum (a, b) = Num(a, b)
+
+let toBools (d : #INum) =
+  [|
+    for i, b in Seq.zip d.Digits d.Bases do
+      for j in 0 .. b - 1 -> j = i
+  |]
+
+let fromBools (d : 'a when 'a :> IBases) (arr : bool[]) =
+  let mutable digits = []
+  let mutable i0 = 0
+  [
+    for b in d.Bases do
+      let slice = arr.[i0 .. i0 + b - 1]
+      i0 <- i0 + b
+      Array.findIndex id slice
+  ]
+
+let inline fromDigits (d : #IFromDigits<_>) ds = d.FromDigits ds
 

@@ -57,6 +57,11 @@ module Split =
   let ins s = [s.CIn; s.XIn]
   let outs s = [s.COut; s.XOutPlus; s.XOutMinus]
 
+  let insOuts ({ Dir = d } as s) =
+    match d with
+    | SplitDir.SDForward -> (ins s, outs s)
+    | SplitDir.SDBackward -> (outs s, ins s)
+
   let fromList sd =
     function 
     | [a; b; c; d; e] -> create ((a, b, c, d, e), sd)

@@ -75,7 +75,7 @@ let identity n = fromPerm (Array.init n id)
 
 let reverse n = fromPerm (Array.init n (fun i -> n - i - 1))
 
-let rotate n k = fromPerm (Array.init n (fun i -> (2 * n - i - 1 + k) % n))
+let rotate n k = fromPerm (Array.init n (fun i -> (n + i + k % n) % n))
 
 let comm a b = fromPerm (Array.append [| a .. a + b - 1 |] [| 0 .. a - 1 |])
 

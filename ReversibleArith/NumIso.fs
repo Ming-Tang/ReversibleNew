@@ -41,8 +41,6 @@ let rep' b bi = comm >>> rep b bi >>> comm
 
 [<AutoOpen>]
 module Builders =
-  open System.Reflection
-
   type INumFromList =
     abstract member NumFromList : int list -> INum
 
@@ -73,6 +71,7 @@ module Builders =
     abstract member SuccRest' : int -> BIso<INum, INum>
 
   type ISuccAddBuilder<'b when 'b :> INum> =
+    inherit IFromDigits<'b>
     inherit SuccBuilder<'b>
     inherit AddBuilder<'b>
     inherit ComplBuilder<'b>
@@ -130,6 +129,8 @@ module Builders =
 
   type SuccDigit<'b when 'b :> IBase> = SuccDigit of 'b with
     interface ISuccAddBuilder<Digit<'b>> with
+      member d.FromDigits ds = match d with SuccDigit b -> (Digit(0, b) :> IFromDigits<_>).FromDigits ds
+
       member d.Succ = match d with SuccDigit b -> succ b
       member d.SuccRest n = let d = d :> ISuccAddBuilder<_> in if n <= 0 then d.Succ else id
       member d.Add = match d with SuccDigit b -> rep' b (succ b)
@@ -158,6 +159,14 @@ module Builders =
 
   type SuccNum<'b, 'n when 'b :> IBase and 'n :> INum> = SuccNum of 'b * ISuccAddBuilder<'n> with
     interface ISuccAddBuilder<Num<'b, 'n>> with
+      member d.FromDigits ds = 
+        let (SuccNum(b, x)) = d
+        match ds with
+        | [] -> failwith "FromDigits: not enough digits"
+        | d0 :: ds' ->
+          let d1 = (Digit(0, b) :> IFromDigits<_>).FromDigits [d0]
+          Num(d1, (x :> IFromDigits<_>).FromDigits(ds'))
+
       member s.Succ = 
         let (SuccNum (b, s')) = s
         let num = num (s :> ISuccAddBuilder<_>)
@@ -246,8 +255,9 @@ module Builders =
     Widths.add (typeof<Num<'b, 'n>>) (getBases sn |> List.sum)
     sn
 
+  open System.Reflection
   let private succNumCtor tb tn = 
-    let td = typedefof<SuccNum<IBase, INum>>.MakeGenericType(tb, tn)
+    let td = typedefof<SuccNum<B10, Digit<B2>>>.MakeGenericType(tb, tn)
     fun a b -> 
       td.InvokeMember(
         "NewSuccNum", BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.InvokeMethod, 

@@ -6,26 +6,28 @@ open System.Text
 
 let empty = { Vertices = Set.empty; Edges = Map.empty; Splits = Set.empty; Inputs = []; Outputs = [] }
 
-let toGraphviz { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = os } =
+let toGraphviz (getLabel: Vertex -> string) { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = os } =
   let ids = Dictionary()
   let vertexId (v : Vertex) = v |> String.concat "." |> sprintf "%A"
 
   let vertexList vs = 
     vs
-    |> Seq.map vertexId 
+    |> Seq.map vertexId
     |> Seq.indexed 
-    |> Seq.map(fun (i, v) -> $"{v} [label={i}, group=a]")
+    |> Seq.map(fun (i, v) -> 
+      $"{v} [label=%A{i}, group=a]"
+    )
     |> String.concat "; "
 
-  let vertexChain vs = 
-    vs
-    |> Seq.map vertexId
-    |> Seq.map (fun v -> $"{v}")
-    |> String.concat " -> "
+  // let vertexChain vs = 
+  //   vs
+  //   |> Seq.map vertexId
+  //   |> Seq.map (fun v -> $"{v}")
+  //   |> String.concat " -> "
 
   let sb = StringBuilder()
   sb.AppendLine("digraph G {") |> ignore
-  sb.AppendLine("  rankdir=LR; node[label=\"\", shape=circle, margin=0, width=0.1];") |> ignore
+  sb.AppendLine("  rankdir=LR; node[shape=circle, margin=0, width=0.1, fontsize=8];") |> ignore
 
   sb.AppendLine("  subgraph cluster_inputs {") |> ignore
   sb.AppendLine("    rank=source; edge[style=invis];") |> ignore
@@ -38,6 +40,9 @@ let toGraphviz { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = 
   sb.AppendLine($"    {vertexList os};") |> ignore
   // sb.AppendLine($"    {vertexChain os};") |> ignore
   sb.AppendLine("  }") |> ignore
+
+  for v in vs do
+    sb.AppendLine($"  {vertexId v}[label=%A{getLabel v}]") |> ignore
 
   for KeyValue(v1, v2) in es do
     sb.AppendLine($"  {vertexId v1} -> {vertexId v2}") |> ignore
@@ -64,19 +69,32 @@ let toGraphviz { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = 
   sb.AppendLine("}") |> ignore
   sb.ToString()
 
+type AdjType = AdjVertex | AdjSplit of Split
+
 let splitsDict ss =
   seq {
     for s in ss do
       match s.Dir with
       | SDForward ->
         let outs = Split.outs s 
-        for v in Split.ins s -> v, outs
+        for v in Split.ins s -> v, (outs, s)
       | SDBackward ->
         let ins = Split.ins s
-        for v in Split.outs s -> v, ins
+        for v in Split.outs s -> v, (ins, s)
   }
   |> dict
 
+let makeGetAdjacents { Vertices = vs; Edges = es; Splits = ss; Outputs = outs } =
+  let sd = lazy splitsDict ss
+  fun v ->
+    if es.ContainsKey(v) then
+      Some (AdjVertex, [es.[v]])
+    elif sd.Value.ContainsKey(v) then
+      let adjs, sp = sd.Value.[v]
+      Some (AdjSplit sp, adjs)
+    else 
+      None
+      
 let private primarySimplify { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = os } =
   let stk = Stack(is)
   let vs' = HashSet()
@@ -94,7 +112,7 @@ let private primarySimplify { Vertices = vs; Edges = es; Splits = ss; Inputs = i
 
       if v = v' then
         if splits.ContainsKey(v) then
-          Seq.iter stk.Push splits.[v]
+          Seq.iter stk.Push <| fst splits.[v]
         elif not <| Seq.contains v os then
           failwith $"simplify: Dead-end vertex ${v}"
       else

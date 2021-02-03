@@ -165,6 +165,10 @@ module NumTests =
     let unmap = n.Unmap(n.Map n.NumberValue)
     sprintf "NumberValue=%A Unmap Map=%A" nv unmap @| (nv = unmap)
 
+  [<Property>]
+  let ``fromBools reverses toBools``(n : INum) =
+    fromBools n (toBools n) = n.Digits
+
 let inline (.=.) expected actual =
   sprintf "%A = %A" expected actual @| (expected = actual)
 
