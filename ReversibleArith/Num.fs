@@ -1,4 +1,5 @@
 ﻿module ReversibleArith.Num
+open System.Collections.Generic
 
 type IBases =
   abstract member Bases : int list
@@ -185,7 +186,12 @@ let fromBools (d : 'a when 'a :> IBases) (arr : bool[]) =
     for b in d.Bases do
       let slice = arr.[i0 .. i0 + b - 1]
       i0 <- i0 + b
-      Array.findIndex id slice
+      (
+        try 
+          Array.findIndex id slice
+        with
+        | :? KeyNotFoundException -> invalidArg "arr" "Invalid format"
+      )
   ]
 
 let inline fromDigits (d : #IFromDigits<_>) ds = d.FromDigits ds

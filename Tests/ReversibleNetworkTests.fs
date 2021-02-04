@@ -5,6 +5,7 @@ open Builders
 open Operators
 open FsCheck
 open FsCheck.Xunit
+open ReversibleArith.Num
 
 type ComposedNetwork = ComposedNetwork of Network
 type SymmetricComposedNetwork = SymmetricComposedNetwork of Network
@@ -177,4 +178,63 @@ module ReversibleNetworkTests =
   [<Property>]
   let ``repeat: inverse property``(SymmetricComposedNetwork f, Size n) =
     repeat n (~~f) .=. ~~(repeat n f)
+
+[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 5)>]
+module ReversibleNetworkArithTests =
+  open ReversibleArithTests
+  open ReversibleArith.Iso
+  open ReversibleArith.NumIso
+
+  let bIsoToNetwork biso =
+    biso |> getSymIso |> FromIso.fromSymIso Network.simplify |> Network.canonicalize
+
+  let eval n s num =
+    Simulator.evaluate n (toBools num) 
+    |> fromBools s
+    |> fromDigits s
+    |> numberValue
+
+  let eval2 n s (num, num') =
+    let arr = Array.append (toBools num) (toBools num')
+    let res = Simulator.evaluate n arr
+
+    let nv1 = 
+      res.[0 .. arr.Length / 2 - 1]
+      |> fromBools s
+      |> fromDigits s
+      |> numberValue
+    let nv2 =
+      res.[arr.Length / 2 .. arr.Length - 1]
+      |> fromBools s
+      |> fromDigits s
+      |> numberValue
+    nv1, nv2
+
+  let succ = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Succ
+  let nSucc = bIsoToNetwork succ 
+  [<Property>]
+  let ``succ n = n + 1 mod B``(Num1 n) =
+    let num, m = numberValue n, modValue n
+    let expected = (num + 1) % m
+    let actual = eval nSucc IsoTests.succNum1 n
+    expected = actual
+
+  [<Property>]
+  let ``plusK n = n + k mod B``(Num1 n, k : int) =
+    let num, m = numberValue n, modValue n
+    let k = k % m
+    let expected = (num + k + m) % m
+    let nPlusK = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst k |> bIsoToNetwork
+    let actual = eval nPlusK IsoTests.succNum1 n
+    expected = actual
+
+  [<Property>]
+  let ``addition mod B``(Num1 n, Num2 n', k : int) =
+    let num, m = numberValue n, modValue n
+    let num' = numberValue n'
+    let k = k % m
+    let expected = (num + (num' * k + m) % m + m) % m
+    let nAdd = (IsoTests.succNum1 :> ISuccAddBuilder<_>).AddMultiple(k) |> bIsoToNetwork
+    let actual, _ = eval2 nAdd IsoTests.succNum1 (n, n')
+    expected = actual
 

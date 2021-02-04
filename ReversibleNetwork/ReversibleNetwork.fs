@@ -54,18 +54,18 @@ module Split =
   let mapOut f = function Split((a, b, c, d, e), sd) -> create((a, f b, c, f d, f e), sd)
   let inverse = function Split(tup, sd) -> create(tup, inverseDir sd)
 
-  let ins s = [s.CIn; s.XIn]
-  let outs s = [s.COut; s.XOutPlus; s.XOutMinus]
+  let inline ins s = [s.CIn; s.XIn]
+  let inline outs s = [s.COut; s.XOutPlus; s.XOutMinus]
 
-  let insOuts ({ Dir = d } as s) =
+  let inline insOuts ({ Dir = d } as s) =
     match d with
     | SplitDir.SDForward -> (ins s, outs s)
     | SplitDir.SDBackward -> (outs s, ins s)
 
-  let fromList sd =
-    function 
+  let inline fromList sd x =
+    match x with 
     | [a; b; c; d; e] -> create ((a, b, c, d, e), sd)
     | _ -> failwith "Split.fromList: length != 5"
 
-  let toList = function Split((a, b, c, d, e), sd) -> [a; b; c; d; e]
+  let inline toList (Split((a, b, c, d, e), sd)) = [a; b; c; d; e]
 

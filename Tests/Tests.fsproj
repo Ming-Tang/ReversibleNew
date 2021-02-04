@@ -8,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="ReversibleNetworkTests.fs" />
     <Compile Include="ReversibleNewTests.fs" />
     <Compile Include="BilliardMachineTests.fs" />
     <Compile Include="ReversibleArithTests.fs" />
+    <Compile Include="ReversibleNetworkTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
