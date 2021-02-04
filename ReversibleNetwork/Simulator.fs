@@ -44,43 +44,57 @@ type Simulator(n) =
   let maxDepth = Seq.max depths.Values
   
   let ops = List()
-  let mutable storages = Dictionary()
-  do
-    for v in vs do
-      let d0 = depths.[v]
-      storages.Add((v, d0), false)
-      if es.ContainsKey(v) then
-        let v' = es.[v]
-        let d1 = depths.[v']
-        for d in d0 + 1 .. d1 - 1 do
-          storages.Add((v', d), false)
-          ops.Add(OpMov((v', d), (v', d + 1)))
+  let storageVertices =
+    seq {
+      for v in vs do
+        let d0 = depths.[v]
+        yield v, d0
+        if es.ContainsKey(v) then
+          let v' = es.[v]
+          let d1 = depths.[v']
+          for d in d0 + 1 .. d1 - 1 do
+            yield v', d
+            ops.Add(OpMov((v', d), (v', d + 1)))
 
-        ops.Add(OpMov((v, d0), (v', d0 + 1)))
+          ops.Add(OpMov((v, d0), (v', d0 + 1)))
 
-    for s in ss do
-      let is, os = Split.insOuts s
-      let d0 = seq { for i in is -> depths.[i] } |> Seq.max
-      match s.Dir with
-      | SplitDir.SDForward -> 
-        OpCMov(((s.CIn, d0), (s.XIn, d0)), 
-               ((s.COut, d0 + 1), (s.XOutPlus, d0 + 1), (s.XOutMinus, d0 + 1)))
-        |> ops.Add
-      | SplitDir.SDBackward ->
-        OpCUnmov(((s.COut, d0), (s.XOutPlus, d0), (s.XOutMinus, d0)),
-                 ((s.CIn, d0 + 1), (s.XIn, d0 + 1)))
-        |> ops.Add
+      for s in ss do
+        let is, os = Split.insOuts s
+        let d0 = seq { for i in is -> depths.[i] } |> Seq.max
+        match s.Dir with
+        | SplitDir.SDForward -> 
+          OpCMov(((s.CIn, d0), (s.XIn, d0)), 
+                 ((s.COut, d0 + 1), (s.XOutPlus, d0 + 1), (s.XOutMinus, d0 + 1)))
+          |> ops.Add
+        | SplitDir.SDBackward ->
+          OpCUnmov(((s.COut, d0), (s.XOutPlus, d0), (s.XOutMinus, d0)),
+                   ((s.CIn, d0 + 1), (s.XIn, d0 + 1)))
+          |> ops.Add
 
-      for o in os do
-        let d1 = depths.[o]
-        for d in d0 + 1 .. d1 - 1 do
-          storages.Add((o, d), false)
-          ops.Add(OpMov((o, d), (o, d + 1)))
+        for o in os do
+          let d1 = depths.[o]
+          for d in d0 + 1 .. d1 - 1 do
+            yield (o, d)
+            ops.Add(OpMov((o, d), (o, d + 1)))
+    }
+    |> Set.ofSeq
+    |> Array.ofSeq
 
-    if Set.ofSeq (Seq.map fst storages.Keys) <> Set.ofSeq vs then
-      failwith "Some vertices are missing from initial storages"
+  let indexByStorageVertex = Seq.indexed storageVertices |> Seq.map (fun (i, v) -> v, i) |> dict
+  let n = storageVertices.Length
+  let vi v = indexByStorageVertex.[v]
+  let iv i = indexByStorageVertex.[i]
 
-  let ops = ops.AsReadOnly()
+  let ops = 
+    [|
+      for op in ops ->
+        match op with
+        | OpMov(v, v') -> OpMov(vi v, vi v')
+        | OpCMov((c, x), (c', p, m)) -> OpCMov((vi c, vi x), (vi c', vi p, vi m))
+        | OpCUnmov((c', p, m), (c, x)) -> OpCUnmov((vi c', vi p, vi m), (vi c, vi x))
+    |]
+
+  let mutable storages = Array.zeroCreate<bool> n
 
   let checkOps() =
     for op in ops do
@@ -93,38 +107,32 @@ type Simulator(n) =
 
   let step() =
     // checkOps()
-    let storages' = Dictionary()
+    let storages' = Array.zeroCreate<bool> n
     for op in ops do
       match op with
-      | OpMov(v, v') -> storages'.Add((v' : Vertex * int), storages.[v])
+      | OpMov(v, v') -> storages'.[v'] <- storages.[v]
       | OpCMov((vc, vx), (vc', vp, vm)) -> 
         let c = storages.[vc]
-        storages'.Add(vc', c)
-        storages'.Add((if c then vp else vm), storages.[vx])
-        storages'.Add((if c then vm else vp), false)
+        storages'.[vc'] <- c
+        storages'.[if c then vp else vm] <- storages.[vx]
+        storages'.[if c then vm else vp] <- false
 
       | OpCUnmov((vc', vp, vm), (vc, vx)) -> 
         let c = storages.[vc']
-        storages'.Add(vc, c)
+        storages'.[vc] <- c
         let xp, xm = storages.[vp], storages.[vm]
-        if (xp && xm) || (c && xm) || (not c && xp) then
-          failwith "step: invalid inputs for OpCUnmov"
-        storages'.Add(vx, xp || xm)
-
-    for v in is do
-      storages'.Add((v, 0), false)
-
-    if storages'.Count <> storages.Count then
-      failwith $"Different number of keys: ${(storages'.Count, storages.Count)}"
+        // if (xp && xm) || (c && xm) || (not c && xp) then
+        //   failwith "step: invalid inputs for OpCUnmov"
+        storages'.[vx] <- xp || xm
 
     storages <- storages'
 
   let setInput (xs : #seq<bool>) =
     for x, v in Seq.zip xs is do
-      storages.[(v, 0)] <- x
+      storages.[iv (v, 0)] <- x
 
   let getOutput() =
-    [| for v in os -> storages.[(v, depths.[v])] |]
+    [| for v in os -> storages.[iv (v, depths.[v])] |]
 
   member s.Step() = step()
   member s.Input xs = setInput xs

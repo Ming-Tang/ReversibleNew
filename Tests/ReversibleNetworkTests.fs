@@ -220,7 +220,8 @@ module ReversibleNetworkArithTests =
     expected = actual
 
   [<Property>]
-  let ``plusK n = n + k mod B``(Num1 n, k : int) =
+  let ``plusK n = n + k mod B``(Num1 n, k : uint) =
+    let k = int k
     let num, m = numberValue n, modValue n
     let k = k % m
     let expected = (num + k + m) % m
@@ -229,7 +230,8 @@ module ReversibleNetworkArithTests =
     expected = actual
 
   [<Property>]
-  let ``addition mod B``(Num1 n, Num2 n', k : int) =
+  let ``addition mod B``(Num1 n, Num2 n', k : uint) =
+    let k = int k
     let num, m = numberValue n, modValue n
     let num' = numberValue n'
     let k = k % m

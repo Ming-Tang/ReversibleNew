@@ -26,8 +26,8 @@ let main argv =
   let maxDepth = ds |> Seq.map ((|KeyValue|) >> snd) |> Seq.max
   printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} splits={n.Splits.Count} maxDepth={maxDepth}"
 
-  for x in 0 .. 10 do
-    let sim = Simulator(n)
+  let sim = Simulator(n)
+  for x in 0 .. 10000 do
     for n1 in 0 .. 63 do
       let input = [| 
         for k in [2; 4; 8; 16; 32; 64] do
