@@ -19,7 +19,7 @@ let main argv =
   let n = 
     iso 
     |> getSymIso 
-    |> FromIso.fromSymIso Network.simplify
+    |> FromIso.fromSymIso (fun x -> x) // Network.simplify
     |> Network.canonicalize
 
   let ds = getDepths n
@@ -27,7 +27,7 @@ let main argv =
   printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} splits={n.Splits.Count} maxDepth={maxDepth}"
 
   let sim = Simulator(n)
-  for x in 0 .. 10000 do
+  for x in 0 .. 1000 do
     for n1 in 0 .. 63 do
       let input = [| 
         for k in [2; 4; 8; 16; 32; 64] do

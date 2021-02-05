@@ -229,6 +229,7 @@ module ReversibleNetworkArithTests =
     let actual = eval nPlusK IsoTests.succNum1 n
     expected = actual
 
+#if FALSE
   [<Property>]
   let ``addition mod B``(Num1 n, Num2 n', k : uint) =
     let k = int k
@@ -239,4 +240,5 @@ module ReversibleNetworkArithTests =
     let nAdd = (IsoTests.succNum1 :> ISuccAddBuilder<_>).AddMultiple(k) |> bIsoToNetwork
     let actual, _ = eval2 nAdd IsoTests.succNum1 (n, n')
     expected = actual
+#endif
 
