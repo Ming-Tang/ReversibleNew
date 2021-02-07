@@ -13,11 +13,11 @@ let boolBackward(c, p, m) =
   c, p || m
 
 type Propagator<'v>(n, forward, backward) =
-  let { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = os } = n
+  let { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } = n
   let ss =
     seq {
       for s in ss do
-        let is, os = Split.insOuts s
+        let is, os = Gate.insOuts s
         for i in is ->
           i, (is, os, s.Dir)
     }

@@ -8,38 +8,9 @@ type Op<'a> =
 | OpCMov of ins: ('a * 'a) * outs: ('a * 'a * 'a)
 | OpCUnmov of ins: ('a * 'a * 'a) * outs: ('a * 'a)
 
-let getDepths ({ Inputs = ins; Outputs = outs; Vertices = vs } as n) =
-  let getAdjacents = makeGetAdjacents n
-  let ds = Dictionary(seq { for v in vs -> KeyValuePair(v, 0) })
-  let visited = HashSet()
-  let stk = Stack(seq { for v in ins -> v, 0 })
-  while stk.Count > 0 do
-    let v, dist = stk.Pop()
-    visited.Add(v) |> ignore
-    ds.[v] <- max ds.[v] dist
-    let dist = ds.[v]
-    match getAdjacents v with
-    | None -> ()
-    | Some (AdjVertex, vs) ->
-      for v' in vs do
-        stk.Push(v', 1 + dist)
-    | Some (AdjSplit s, _) ->
-      let ins, outs = Split.insOuts s
-      for v' in ins do
-        ds.[v'] <- max ds.[v] dist
-
-      if Seq.forall visited.Contains ins then
-        for v' in outs do
-          stk.Push(v', 1 + dist)
-
-  let maxOut = Seq.map (fun v -> ds.[v]) outs |> Seq.max
-  for v in outs do 
-    ds.[v] <- maxOut
-
-  ds
 
 type Simulator(n) =
-  let { Vertices = vs; Edges = es; Splits = ss; Inputs = is; Outputs = os } = n
+  let { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } = n
   let depths = getDepths n
   let maxDepth = Seq.max depths.Values
   
@@ -62,7 +33,7 @@ type Simulator(n) =
   let ssPart() =
     seq {
       for s in ss do
-        let is, os = Split.insOuts s
+        let is, os = Gate.insOuts s
         let d0 = seq { for i in is -> depths.[i] } |> Seq.max
         match s.Dir with
         | SplitDir.SDForward -> 

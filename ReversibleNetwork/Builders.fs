@@ -5,18 +5,21 @@ let private unionMap m1 m2 =
   Map.fold (fun m0 k v -> Map.add k v m0) m1 m2
 
 let inverse f =
-  let { Inputs = is; Outputs = os; Vertices = vs; Edges = es; Splits = ss } = f
+  let { Inputs = is; Outputs = os; Vertices = vs; Edges = es; Gates = ss } = f
   let es' = es |> Seq.map (fun (KeyValue(k, v)) -> v, k) |> Map.ofSeq
-  let ss' = ss |> Set.map Split.inverse
-  { f with Edges = es'; Inputs = os; Outputs = is; Splits = ss' }
+  let ss' = ss |> Set.map Gate.inverse
+  { f with Edges = es'; Inputs = os; Outputs = is; Gates = ss' }
 
-let private rsLock = obj()
-let mutable private _i = 0
-/// Random string
-let private rs() = 
-  lock rsLock <| fun _ ->
-    _i <- _i + 1 
-    string _i
+[<AutoOpen>]
+module RandomString =
+  let private rsLock = obj()
+  let mutable private _i = 0
+
+  /// Random string
+  let rs() = 
+    lock rsLock <| fun _ ->
+      _i <- _i + 1 
+      string _i
 
 let rec ensureDisjoint f g =
   let { Vertices = fvs }, { Vertices = gvs } = f, g
@@ -39,7 +42,7 @@ let stack f g =
   {
     Vertices = Set.union f'.Vertices g'.Vertices
     Edges = unionMap f'.Edges g'.Edges
-    Splits = Set.union f'.Splits g'.Splits
+    Gates = Set.union f'.Gates g'.Gates
     Inputs = f'.Inputs @ g'.Inputs
     Outputs = f'.Outputs @ g'.Outputs
   }
@@ -55,7 +58,7 @@ let compose f g =
   {
     Vertices = Set.union f'.Vertices g'.Vertices
     Edges = unionMap bridges (unionMap f'.Edges g'.Edges)
-    Splits = Set.union f'.Splits g'.Splits
+    Gates = Set.union f'.Gates g'.Gates
     Inputs = f'.Inputs
     Outputs = g'.Outputs
   }
@@ -65,7 +68,7 @@ let forwardSplit =
   {
     Vertices = Set.ofList [c; c'; x; xp; xm]
     Edges = Map.empty
-    Splits = Set.ofList [split (spl, SplitDir.SDForward)]
+    Gates = Set.ofList [split (spl, SplitDir.SDForward)]
     Inputs = [c; x]
     Outputs = [c'; xp; xm]
   }
@@ -78,14 +81,17 @@ let fromPerm p =
   if List.ofArray sorted <> List.ofArray ascending then
     invalidArg "p" $"fromPerm: invalid permutation: %A{p}"
 
-  let inputs = Array.map (fun x -> [sprintf "p%d" x; rs()]) ascending
-  let outputs = Array.map (fun x -> [sprintf "q%d" x; rs()]) ascending
-  let edges = inputs |> Seq.mapi (fun i inp -> inp, outputs.[p.[i]]) 
-              |> Map.ofSeq
+  let inputs = ascending |> Array.map (fun x -> [sprintf "p%d" x; rs()])
+  let outputs = ascending |> Array.map (fun x -> [sprintf "q%d" x; rs()])
+  let edges = 
+    inputs
+    |> Seq.mapi (fun i inp -> inp, outputs.[p.[i]]) 
+    |> Map.ofSeq
+
   {
     Vertices = Set.ofSeq (Seq.append inputs outputs)
     Edges = edges
-    Splits = Set.empty
+    Gates = Set.empty
     Inputs = List.ofArray inputs
     Outputs = List.ofArray outputs
   }
@@ -108,12 +114,12 @@ let multiplex n =
 
   let ins = [ yield ci; yield! inputs ]
   let outs = [ yield co; yield! outPs; yield! outMs ]
-  let vs = Set.ofSeq <| Seq.concat [inputs; outPs; outMs; interms]
-  let splits = Array.init n <| fun i -> 
+  let vs = Seq.concat [inputs; outPs; outMs; interms] |> Set.ofSeq
+  let gs = Array.init n <| fun i -> 
     { CIn = interms.[i]; COut = interms.[i + 1]; XIn = inputs.[i]
       XOutPlus = outPs.[i]; XOutMinus = outMs.[i]; Dir = SDForward }
 
-  { Vertices = vs; Edges = Map.empty; Splits = Set.ofArray splits
+  { Vertices = vs; Edges = Map.empty; Gates = Set.ofArray gs
     Inputs = ins; Outputs = outs }
 
 let demultiplex n = multiplex n |> inverse

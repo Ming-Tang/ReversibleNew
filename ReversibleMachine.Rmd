@@ -117,19 +117,20 @@ $$\operatorname{cperm}(p)  =
 \begin{bmatrix}
 \begin{matrix}I_1 \\ T^+_n\end{matrix} &
 \begin{matrix}I_1 \\ S_{2n,1} \end{matrix} &
-\begin{matrix}I_2 \\ P(p) \\ I_n \end{matrix} &
-\begin{matrix}R_2 \\ S_{2n,2n} \end{matrix} &
-\begin{matrix}I_1 \\ T^+_n \end{matrix} &
-\begin{matrix}R_2 \\ I_n \end{matrix} &
-
+\begin{matrix}R_2 \\ P(p) \\ I_n \end{matrix} &
+\begin{matrix}I_1 \\ S_{1,2n} \end{matrix} &
+\begin{matrix}I_1 \\ \tilde T^-_n \end{matrix} &
+\begin{matrix}R_2 \\ I_n \end{matrix}
 \end{bmatrix}
 $$
 
 ## Definition of $T^\pm_n$
 
-$$\begin{aligned}
-T^\pm_1 &= T^\pm &:&\quad 2 \leftrightarrow 3 \\
-T^\pm_{n+1} &= \begin{bmatrix} \begin{matrix}
+$$T^\pm_1 = T^\pm : \ 2 \leftrightarrow 3$$
+
+$$
+T^\pm_{n+1} = \begin{bmatrix}
+\begin{matrix}
 T^\pm \\ I_n
 \end{matrix}
 \ \begin{matrix}
@@ -139,5 +140,5 @@ I_2 \\ T^\pm_n
 I_1 \\ S_{1,n} \\ I_{n+1}
 \end{matrix}
 \end{bmatrix}
-&:&\quad (n + 1) \leftrightarrow (2n + 1)
-\end{aligned}$$
+:\ (n + 1) \leftrightarrow (2n + 1)
+$$

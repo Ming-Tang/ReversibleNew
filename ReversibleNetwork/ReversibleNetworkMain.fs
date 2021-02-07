@@ -2,6 +2,7 @@
 open System.IO
 open System.Diagnostics
 open ReversibleNetwork
+open ReversibleNetwork.Network
 // open Builders
 // open Builders.Operators
 open Simulator
@@ -57,11 +58,11 @@ let exportSymIso iso =
 let exportGraphviz n =
   let ds = getDepths n
   let maxDepth = ds |> Seq.map ((|KeyValue|) >> snd) |> Seq.max
-  printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} splits={n.Splits.Count} maxDepth={maxDepth}"
+  printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} gates={n.Gates.Count} maxDepth={maxDepth}"
 
   let graphviz = 
     n
-    |> Network.toGraphviz (fun v -> $"""{String.concat "." v}:{ds.[v]}""") 
+    |> toGraphviz (fun v -> $"""{String.concat "." v}:{ds.[v]}""") 
     |> sprintf "%s"
   File.WriteAllText("input.dot", graphviz)
   let p = Process.Start("dot", "-Tsvg input.dot -o output.svg")

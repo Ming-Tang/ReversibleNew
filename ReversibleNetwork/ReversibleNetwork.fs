@@ -11,7 +11,7 @@ module Types =
     | SDForward -> SDBackward
     | SDBackward -> SDForward
 
-  type Split =
+  type Gate =
     {
       CIn : Vertex
       COut : Vertex
@@ -25,7 +25,7 @@ module Types =
     {
       Vertices : Set<Vertex>
       Edges : Map<Vertex, Vertex>
-      Splits : Set<Split>
+      Gates : Set<Gate>
       Inputs : Vertex list
       Outputs : Vertex list
     }
@@ -45,22 +45,27 @@ module Types =
   let inline (|SplitList|) s = splitToList s
 
 [<RequireQualifiedAccess>]
-module Split =
+module Gate =
   let inline create ((cIn, cOut, xIn, xOutPlus, xOutMinus), sd) = 
     { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd }
 
   let inline map f (Split((a, b, c, d, e), sd)) = create((f a, f b, f c, f d, f e), sd)
-  let inline mapIn f (Split((a, b, c, d, e), sd)) = create((f a, b, f c, d, e), sd)
-  let inline mapOut f (Split((a, b, c, d, e), sd)) = create((a, f b, c, f d, f e), sd)
+  let inline mapInConns f (Split((a, b, c, d, e), sd)) = create((f a, b, f c, d, e), sd)
+  let inline mapOutConns f (Split((a, b, c, d, e), sd)) = create((a, f b, c, f d, f e), sd)
   let inline inverse (Split(tup, sd)) = create(tup, inverseDir sd)
 
-  let inline ins s = [s.CIn; s.XIn]
-  let inline outs s = [s.COut; s.XOutPlus; s.XOutMinus]
+  let inline private inConns s = [s.CIn; s.XIn]
+  let inline private outConns s = [s.COut; s.XOutPlus; s.XOutMinus]
 
   let inline insOuts ({ Dir = d } as s) =
     match d with
-    | SplitDir.SDForward -> (ins s, outs s)
-    | SplitDir.SDBackward -> (outs s, ins s)
+    | SDForward -> inConns s, outConns s
+    | SDBackward -> outConns s, inConns s
+
+  let inline mapOuts f s =
+    match s.Dir with
+    | SDForward -> mapOutConns f s
+    | SDBackward -> mapInConns f s
 
   let inline fromList sd x =
     match x with 
