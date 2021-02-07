@@ -68,7 +68,7 @@ let forwardSplit =
   {
     Vertices = Set.ofList [c; c'; x; xp; xm]
     Edges = Map.empty
-    Gates = Set.ofList [split (spl, SplitDir.SDForward)]
+    Gates = Set.ofList [Split (spl, SplitDir.SDForward)]
     Inputs = [c; x]
     Outputs = [c'; xp; xm]
   }
@@ -116,8 +116,7 @@ let multiplex n =
   let outs = [ yield co; yield! outPs; yield! outMs ]
   let vs = Seq.concat [inputs; outPs; outMs; interms] |> Set.ofSeq
   let gs = Array.init n <| fun i -> 
-    { CIn = interms.[i]; COut = interms.[i + 1]; XIn = inputs.[i]
-      XOutPlus = outPs.[i]; XOutMinus = outMs.[i]; Dir = SDForward }
+    Split((interms.[i], interms.[i + 1], inputs.[i], outPs.[i], outMs.[i]), SplitDir.SDForward)
 
   { Vertices = vs; Edges = Map.empty; Gates = Set.ofArray gs
     Inputs = ins; Outputs = outs }

@@ -8,7 +8,6 @@ type Op<'a> =
 | OpCMov of ins: ('a * 'a) * outs: ('a * 'a * 'a)
 | OpCUnmov of ins: ('a * 'a * 'a) * outs: ('a * 'a)
 
-
 type Simulator(n) =
   let { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } = n
   let depths = getDepths n
