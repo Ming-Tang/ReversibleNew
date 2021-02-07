@@ -44,7 +44,7 @@ type Simulator(n) =
   let maxDepth = Seq.max depths.Values
   
   let ops = List()
-  let storageVertices =
+  let vsPart() =
     seq {
       for v in vs do
         let d0 = depths.[v]
@@ -57,7 +57,10 @@ type Simulator(n) =
             ops.Add(OpMov((v', d), (v', d + 1)))
 
           ops.Add(OpMov((v, d0), (v', d0 + 1)))
+    }
 
+  let ssPart() =
+    seq {
       for s in ss do
         let is, os = Split.insOuts s
         let d0 = seq { for i in is -> depths.[i] } |> Seq.max
@@ -77,26 +80,35 @@ type Simulator(n) =
             yield (o, d)
             ops.Add(OpMov((o, d), (o, d + 1)))
     }
+
+  let storageVertices =
+    Seq.append (vsPart()) (ssPart())
+#if CHECKS
     |> Set.ofSeq
+#endif
     |> Array.ofSeq
 
-  let indexByStorageVertex = Seq.indexed storageVertices |> Seq.map (fun (i, v) -> v, i) |> dict
+  let indexByStorageVertex = 
+    seq { for i, v in Seq.indexed storageVertices -> v, i }
+    |> dict
   let n = storageVertices.Length
-  let vi v = indexByStorageVertex.[v]
-  let iv i = indexByStorageVertex.[i]
 
   let ops = 
     [|
+      let iv = indexByStorageVertex
       for op in ops ->
         match op with
-        | OpMov(v, v') -> OpMov(vi v, vi v')
-        | OpCMov((c, x), (c', p, m)) -> OpCMov((vi c, vi x), (vi c', vi p, vi m))
-        | OpCUnmov((c', p, m), (c, x)) -> OpCUnmov((vi c', vi p, vi m), (vi c, vi x))
+        | OpMov(v, v') -> OpMov(iv.[v], iv.[v'])
+        | OpCMov((c, x), (c', p, m)) -> 
+          OpCMov((iv.[c], iv.[x]), (iv.[c'], iv.[p], iv.[m]))
+        | OpCUnmov((c', p, m), (c, x)) -> 
+          OpCUnmov((iv.[c'], iv.[p], iv.[m]), (iv.[c], iv.[x]))
     |]
 
   let mutable storages = Array.zeroCreate<bool> n
 
   let checkOps() =
+#if CHECKS
     for op in ops do
       match op with
       | OpMov(v, v') -> storages.[v] |> ignore
@@ -104,9 +116,12 @@ type Simulator(n) =
       | OpCUnmov((vc', vp, vm), (vc, vx)) -> 
         for v in [ vc; vx; vc'; vp; vm ] do
           storages.[v] |> ignore
+#else
+    ()
+#endif
 
   let step() =
-    // checkOps()
+    checkOps()
     let storages' = Array.zeroCreate<bool> n
     for op in ops do
       match op with
@@ -121,18 +136,20 @@ type Simulator(n) =
         let c = storages.[vc']
         storages'.[vc] <- c
         let xp, xm = storages.[vp], storages.[vm]
-        // if (xp && xm) || (c && xm) || (not c && xp) then
-        //   failwith "step: invalid inputs for OpCUnmov"
+#if CHECKS
+        if (xp && xm) || (c && xm) || (not c && xp) then
+          failwith "step: invalid inputs for OpCUnmov"
+#endif
         storages'.[vx] <- xp || xm
 
     storages <- storages'
 
   let setInput (xs : #seq<bool>) =
     for x, v in Seq.zip xs is do
-      storages.[iv (v, 0)] <- x
+      storages.[indexByStorageVertex.[(v, 0)]] <- x
 
   let getOutput() =
-    [| for v in os -> storages.[iv (v, depths.[v])] |]
+    [| for v in os -> storages.[indexByStorageVertex.[(v, depths.[v])]] |]
 
   member s.Step() = step()
   member s.Input xs = setInput xs
@@ -145,6 +162,10 @@ type Simulator(n) =
 
     getOutput()
 
-let evaluate n xs =
+let evaluate' n xs =
   Simulator(n).Evaluate xs
+
+open Propagator
+let evaluate n xs =
+  Propagator(n, boolForward, boolBackward).Evaluate xs
 

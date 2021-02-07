@@ -5,11 +5,18 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OtherFlags></OtherFlags>
+    <DefineConstants>TRACE;CHECKS1;DISJOINT1</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="ReversibleNetwork.fs" />
     <Compile Include="Network.fs" />
     <Compile Include="Builders.fs" />
     <Compile Include="FromIso.fs" />
+    <Compile Include="Propagator.fs" />
     <Compile Include="Simulator.fs" />
     <Compile Include="ReversibleNetworkMain.fs" />
   </ItemGroup>

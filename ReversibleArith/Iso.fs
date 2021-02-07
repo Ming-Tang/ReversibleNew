@@ -36,6 +36,7 @@ type SymIsoFunc =
 | FId of int option
 | FNum of _bases : int list
 | FSucc of _base : int
+| FCompl of _base : int
 | FAddDigit of n : int * _base : int
 | FComm of (int * int) option
 | FAssoc of (int * int * int) option
@@ -45,11 +46,13 @@ type SymIsoPFunc =
 | PFCond of value : int * _base : int
 | PFCondLast of _base : int
 
-let private patSub = new Regex(@"_\{.+\}$")
+// let private patSub = new Regex(@"_\{.+\}$")
+let private patSub = new Regex(@"^$")
 let funcNameLaTeX' =
   function
   | FId None -> sprintf "I"
   | FId (Some n) -> sprintf "I_{%d}" n
+  | FCompl n -> sprintf "R_{%d}" n
   | FNum [b] ->
     sprintf "N_{%d}" b
   | FNum (b :: bs) ->
@@ -171,7 +174,8 @@ module Operators =
 open Operators
 
 let id : BIso<'a, 'a> = fun _ ->
-  Iso((fun x -> x), (fun x -> x), lazy SFunc(FId <| Widths.getFrom<'a>()))
+  let si = SFunc(FId <| Widths.getFrom<'a>())
+  Iso((fun x -> x), (fun x -> x), lazy si)
 
 let comm : BIso<'a * 'b, 'b * 'a> = fun _ ->
   Iso((fun (x, y) -> y, x), (fun (x, y) -> y, x), 

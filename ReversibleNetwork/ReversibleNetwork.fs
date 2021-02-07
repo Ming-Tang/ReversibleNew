@@ -49,10 +49,10 @@ module Split =
   let inline create ((cIn, cOut, xIn, xOutPlus, xOutMinus), sd) = 
     { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd }
 
-  let map f = function Split((a, b, c, d, e), sd) -> create((f a, f b, f c, f d, f e), sd)
-  let mapIn f = function Split((a, b, c, d, e), sd) -> create((f a, b, f c, d, e), sd)
-  let mapOut f = function Split((a, b, c, d, e), sd) -> create((a, f b, c, f d, f e), sd)
-  let inverse = function Split(tup, sd) -> create(tup, inverseDir sd)
+  let inline map f (Split((a, b, c, d, e), sd)) = create((f a, f b, f c, f d, f e), sd)
+  let inline mapIn f (Split((a, b, c, d, e), sd)) = create((f a, b, f c, d, e), sd)
+  let inline mapOut f (Split((a, b, c, d, e), sd)) = create((a, f b, c, f d, f e), sd)
+  let inline inverse (Split(tup, sd)) = create(tup, inverseDir sd)
 
   let inline ins s = [s.CIn; s.XIn]
   let inline outs s = [s.COut; s.XOutPlus; s.XOutMinus]

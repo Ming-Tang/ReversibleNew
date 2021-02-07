@@ -4,7 +4,7 @@ open Iso.Operators
 open Num
 
 /// Digit complement
-let compl b = BIso(complDigit, complDigit, lazy SFunc (FSucc (b :> IBase).Base))
+let compl b = BIso(complDigit, complDigit, lazy SFunc (FCompl (b :> IBase).Base))
 
 /// Digit successor
 let succ b = BIso(succDigit, predDigit, lazy SFunc (FSucc (b :> IBase).Base))
@@ -184,15 +184,18 @@ module Builders =
           |> group (sprintf "succRest(%d; %s)" n <| basesName s)
 
       member s.Add = 
+        let name = $"add({basesName s})"
         let (SuccNum (b, s')) = s
-        let num, num' = num (s :> ISuccAddBuilder<_>), num (s' :> ISuccAddBuilder<_>)
+        let num, num' = num (s :> ISuccAddBuilder<Num<'b, 'n>>), num (s' : ISuccAddBuilder<'n>)
+        let p = (getSymIso num, getSymIso num')
+        let (Bases b1, Bases b2) = (s, s')
         let succ = (s :> ISuccAddBuilder<_>).Succ
-        let splitDigits = assoc >>> (id &&& (sym assoc >>> (comm &&& id) >>> assoc)) >>> sym assoc
-        let joinA = (id &&& (sym assoc >>> (num' &&& id))) >>> sym assoc
-        let addB = ((rep b succ >>> comm) &&& id)
-        let join = assoc >>> joinA >>> addB >>> assoc
+        let splitDigits = group $"{name}.sD" (assoc >>> (id &&& (sym assoc >>> (comm &&& id) >>> assoc)) >>> sym assoc)
+        let joinA = group $"{name}.jA" ((id &&& (sym assoc >>> (num &&& id))) >>> sym assoc)
+        let addB = group $"{name}.aB" ((rep b succ >>> comm) &&& id)
+        let join = group $"{name}.j" (assoc >>> joinA >>> addB >>> assoc)
         ((sym num &&& sym num) >>> splitDigits >>> (comm &&& s'.Add) >>> join >>> (id &&& num))
-        |> group (sprintf "add(%s)" <| basesName s)
+        |> group name
 
       member s.Fold (state, makeIso) =
         let (SuccNum (b, s')) = s
@@ -232,7 +235,6 @@ module Builders =
               s'.NumFromList xs)
 
     interface ISuccAddBuilder with
-
       member s.Bases = 
         let (SuccNum (b, s')) = s
         [b.Base] @ s'.Bases
@@ -242,7 +244,6 @@ module Builders =
 
     interface INumFromList with
       member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
-
 
   let succDigit (b : 't when 't :> IBase) = 
     let sd = SuccDigit b

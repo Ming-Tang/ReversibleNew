@@ -190,9 +190,36 @@ let fromBools (d : 'a when 'a :> IBases) (arr : bool[]) =
         try 
           Array.findIndex id slice
         with
-        | :? KeyNotFoundException -> invalidArg "arr" "Invalid format"
+        | :? KeyNotFoundException -> invalidArg "arr" "Invalid format: all false"
       )
   ]
 
 let inline fromDigits (d : #IFromDigits<_>) ds = d.FromDigits ds
+
+let numFromBools d x = fromBools d x |> fromDigits d
+
+let intFromBools d x = numberValue <| numFromBools d x
+
+let intToBools (s : #IBases) n1 =
+  let bs = getBases s
+  let m = List.reduce (*) bs
+  [| 
+    let mutable q = 1
+    for b in bs do
+      for i in 0 .. b - 1 ->
+        i = (n1 / q) % b
+      q <- q * b
+  |]
+
+let boolsFromIntPair (s1, s2) (n1, n2) =
+  Array.append (intToBools s1 n1) (intToBools s2 n2)
+
+let numPairFromBools (s1: #IBases, s2: #IBases) (bs : bool[]) : 'n1 * 'n2 =
+  let m = List.sum <| getBases s1
+  numFromBools s1 bs.[0 .. m - 1],
+  numFromBools s2 bs.[m .. bs.Length]
+
+let intPairFromBools (s1, s2) bs =
+  let a, b = numPairFromBools (s1, s2) bs
+  numberValue a, numberValue b
 

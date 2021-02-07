@@ -7,6 +7,7 @@ open ReversibleArith.Iso
 open ReversibleArith.Iso.Operators
 open ReversibleArith.NumIso
 
+type Bool = Bool of Digit<B2>
 type Num0 = Num0 of Digit<B10>
 type Num1 = Num1 of Num<B6, Num<B10, Digit<B8>>>
 type Num2 = Num2 of Num<B9, Num<B5, Num<B6, Digit<B7>>>>
@@ -87,11 +88,17 @@ type Generators =
     }
     |> Arb.fromGen
 
+  static member Bool() =
+    gen {
+      let! a = Gen.choose (0, 1)
+      return Bool(Digit(a, B2))
+    }
+    |> Arb.fromGen
 
   static member Num0() =
     gen {
       let! a = Gen.choose (0, 9)
-      return Digit(a, B10)
+      return Num0(Digit(a, B10))
     }
     |> Arb.fromGen
 
@@ -137,7 +144,7 @@ type Generators =
       }
       |> Gen.filter (fun n ->
         try
-          ignore (n.Mod)
+          ignore n.Mod
           true
         with
         | :? System.OverflowException -> false
@@ -174,6 +181,7 @@ let inline (.=.) expected actual =
 
 [<Properties(Arbitrary = [| typeof<Generators> |], MaxTest = 1000)>]
 module IsoTests =
+  let succBool = succDigit B2
   let succNum0 = succDigit B10
   let succNum1 = succNum B6 (succNum B10 <| succDigit B8)
   let succNum2 = succNum B9 (succNum B5 (succNum B6 <| succDigit B7))
@@ -201,6 +209,56 @@ module IsoTests =
     let expected = (num + (k % m) + m) % m
     let actual = numberValue (plusConst <<| n)
     expected .=. actual
+
+  [<Property>]
+  let ``cond: compose property (same)``(Num0 n, Num0 k, Num0 i) =
+    let i = numberValue i
+    let sb = (succNum0 :> ISuccAddBuilder<_>)
+    let f, g = sb.Neg, (sb.Succ >>> sb.Succ)
+    let f1 = cond (Digit(i, B10)) f >>> cond (Digit(i, B10)) g
+    let f2 = cond (Digit(i, B10)) (f >>> g)
+
+    let expected = f1 <<| (n, k)
+    let actual = f2 <<| (n, k)
+    expected .=. actual
+
+  [<Property>]
+  let ``cond: compose property``(Num0 n, Num0 k, Num0 i, Num0 j) =
+    let i, j = numberValue i, numberValue j
+    if i = j then 
+      false ==> false
+    else
+      let sb = (succNum0 :> ISuccAddBuilder<_>)
+      let f, g = sb.Neg, (sb.Succ >>> sb.Succ)
+      let f1 = cond (Digit(i, B10)) f >>> cond (Digit(j, B10)) g
+      let f2 = cond (Digit(j, B10)) g >>> cond (Digit(i, B10)) f
+
+      let expected = f1 <<| (n, k)
+      let actual = f2 <<| (n, k)
+      true ==> (expected .=. actual)
+
+  [<Property>]
+  let ``rep: doubling property``(Num0 n, Num0 k) =
+    let sb = (succNum0 :> ISuccAddBuilder<_>)
+    let f = sb.Succ >>> sb.Succ >>> sb.Neg >>> sb.Compl >>> ~~sb.Succ
+    let f1 = rep B10 (f >>> f)
+    let f2 = rep B10 f >>> rep B10 f
+
+    let expected = f1 <<| (n, k)
+    let actual = f2 <<| (n, k)
+    true ==> (expected .=. actual)
+
+  [<Property>]
+  let ``rep: doubling property (more digits)``(Num1 n, Num1 m, Num0 k) =
+    let sb = (succNum0 :> ISuccAddBuilder<_>)
+    let sb1 = (succNum1 :> ISuccAddBuilder<_>)
+    let f = sb1.AddMultiple 2
+    let f1 = rep B10 (f >>> f)
+    let f2 = rep B10 f >>> rep B10 f
+
+    let expected = f1 <<| (k, (n, m))
+    let actual = f2 <<| (k, (n, m))
+    true ==> (expected .=. actual)
 
   [<Property>]
   let ``repeat k (succ n) = (n + k mod B, k)``(Num1 n, Num1 k) =
@@ -266,10 +324,25 @@ module IsoTests =
     expected .=. actual
 
   [<Property>]
+  let ``neg n = -n mod B``(Num1 n) =
+    let neg = sym (succNum1 :> ISuccAddBuilder<_>).Neg
+    let expected = (modValue n - numberValue n) % modValue n
+    let actual = numberValue (neg <<| n)
+    expected .=. actual
+
+  [<Property>]
   let ``neg (neg n) = n``(Num1 n) =
     let neg = sym (succNum1 :> ISuccAddBuilder<_>).Neg
     let expected = numberValue n
     let actual = numberValue ((neg >>> neg) <<| n)
+    expected .=. actual
+
+  [<Property>]
+  let ``fst add(m, n) = fst add(n, m)``(Num1 m, Num1 n) =
+    let num1, num2 = numberValue m, numberValue n
+    let add = (succNum1 :> ISuccAddBuilder<_>).Add
+    let expected = fst (add <<| (m, n))
+    let actual = fst (add <<| (n, m))
     expected .=. actual
 
   [<Property>]
