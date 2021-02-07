@@ -7,7 +7,7 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <OtherFlags></OtherFlags>
-    <DefineConstants>TRACE;CHECKS1;DISJOINT1</DefineConstants>
+    <DefineConstants>TRACE;CHECKS;DISJOINT</DefineConstants>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
 

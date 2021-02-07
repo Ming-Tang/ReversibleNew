@@ -1,5 +1,5 @@
 ﻿module ReversibleNetwork.FromIso
-open ReversibleNetwork.Network
+// open ReversibleNetwork.Network
 open ReversibleArith.Iso
 open Builders
 open Builders.Operators

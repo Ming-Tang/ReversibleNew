@@ -190,7 +190,9 @@ let fromBools (d : 'a when 'a :> IBases) (arr : bool[]) =
         try 
           Array.findIndex id slice
         with
-        | :? KeyNotFoundException -> invalidArg "arr" "Invalid format: all false"
+        | :? KeyNotFoundException -> 
+          -1
+          //invalidArg "arr" "Invalid format: all false"
       )
   ]
 

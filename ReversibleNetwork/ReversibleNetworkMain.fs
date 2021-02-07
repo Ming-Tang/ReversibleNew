@@ -72,7 +72,7 @@ let exportGraphviz n =
 let main argv =
 
   // let s = succDigit B5
-  let s = succNum B2 (succDigit B2)
+  let s = succNum B2 (succNum B2 (succDigit B2))
   // let s = succNum B2 (succNum B2 (succNum B2 (succDigit B2)))
   // let s = succNum B5 (succNum B4 (succNum B4 (succDigit B6)))
 
@@ -90,9 +90,9 @@ let main argv =
     |> Network.simplify
     |> Network.canonicalize
 
-  exportGraphviz nAdd
   // runNetwork s n (fun n -> $"-({n} + {plusConst})")
   runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}, {b}")
+  exportGraphviz nAdd
 
   printfn "-"
 

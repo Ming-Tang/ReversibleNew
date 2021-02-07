@@ -46,31 +46,42 @@ let toGraphviz (getLabel: Vertex -> string) { Vertices = vs; Edges = es; Gates =
   for KeyValue(v1, v2) in es do
     sb.AppendLine($"  {vertexId v1} -> {vertexId v2}") |> ignore
 
-  for i, { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd } in Seq.indexed ss do
-    sb.AppendLine("  {") |> ignore
-    let rarr, larr = "&rarr;", "&larr;"
-    let arr =
-      match sd with 
-      | SplitDir.SDForward -> rarr 
-      | SplitDir.SDBackward -> larr
+  for i, sp in Seq.indexed ss do
+    match sp with
+    | { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Buffer = bs; Dir = sd; } ->
+      sb.AppendLine("  {") |> ignore
+      let rarr, larr = "&rarr;", "&larr;"
+      let arr =
+        match sd with 
+        | SplitDir.SDForward -> rarr 
+        | SplitDir.SDBackward -> larr
+        | SplitDir.SDBuffer -> ""
 
-    sb.AppendLine($"    split_{i} [shape=square, label=\"{arr}\"]") |> ignore
-    match sd with
-    | SplitDir.SDForward -> 
-      sb.AppendLine($"    {vertexId cIn} -> split_{i} [label=c]") |> ignore
-      sb.AppendLine($"    {vertexId xIn} -> split_{i} [label=x]") |> ignore
-      sb.AppendLine($"    split_{i} -> {vertexId cOut} [label=c1]") |> ignore
-      sb.AppendLine($"    split_{i} -> {vertexId xOutPlus} [label=xp]") |> ignore
-      sb.AppendLine($"    split_{i} -> {vertexId xOutMinus} [label=xm]") |> ignore
+      let splitLine = lazy $"    split_{i} [shape=square, label=\"{arr}\"]"
+      match sd with
+      | SplitDir.SDBuffer ->
+        let mids = bs |> Seq.mapi (fun j _ -> $"buf{i}_{j} [label=b{i}]") |> String.concat "; "
+        sb.AppendLine($"    subgraph cluster_mid{i} {{ rank=same; edge[style=invis]; {mids} }}") |> ignore
+        for j, (v, v') in Seq.indexed bs do
+          sb.AppendLine($"    {vertexId v} -> buf{i}_{j} -> {vertexId v'}") |> ignore
 
-    | SplitDir.SDBackward -> 
-      sb.AppendLine($"    split_{i} -> {vertexId cIn} [label=c]") |> ignore
-      sb.AppendLine($"    split_{i} -> {vertexId xIn} [label=x]") |> ignore
-      sb.AppendLine($"    {vertexId cOut} -> split_{i} [label=c1]") |> ignore
-      sb.AppendLine($"    {vertexId xOutPlus} -> split_{i} [label=xp]") |> ignore
-      sb.AppendLine($"    {vertexId xOutMinus} -> split_{i} [label=xm]") |> ignore
+      | SplitDir.SDForward -> 
+        sb.AppendLine(splitLine.Value) |> ignore
+        sb.AppendLine($"    {vertexId cIn} -> split_{i} [label=c]") |> ignore
+        sb.AppendLine($"    {vertexId xIn} -> split_{i} [label=x]") |> ignore
+        sb.AppendLine($"    split_{i} -> {vertexId cOut} [label=c1]") |> ignore
+        sb.AppendLine($"    split_{i} -> {vertexId xOutPlus} [label=xp]") |> ignore
+        sb.AppendLine($"    split_{i} -> {vertexId xOutMinus} [label=xm]") |> ignore
 
-    sb.AppendLine("  }") |> ignore
+      | SplitDir.SDBackward -> 
+        sb.AppendLine(splitLine.Value) |> ignore
+        sb.AppendLine($"    split_{i} -> {vertexId cIn} [label=c]") |> ignore
+        sb.AppendLine($"    split_{i} -> {vertexId xIn} [label=x]") |> ignore
+        sb.AppendLine($"    {vertexId cOut} -> split_{i} [label=c1]") |> ignore
+        sb.AppendLine($"    {vertexId xOutPlus} -> split_{i} [label=xp]") |> ignore
+        sb.AppendLine($"    {vertexId xOutMinus} -> split_{i} [label=xm]") |> ignore
+
+      sb.AppendLine("  }") |> ignore
 
   sb.AppendLine("}") |> ignore
   sb.ToString()

@@ -5,6 +5,7 @@ open System.Collections.Generic
 
 type Op<'a> = 
 | OpMov of 'a * 'a 
+| OpBuf of buf : ('a * 'a) list
 | OpCMov of ins: ('a * 'a) * outs: ('a * 'a * 'a)
 | OpCUnmov of ins: ('a * 'a * 'a) * outs: ('a * 'a)
 
@@ -43,6 +44,11 @@ type Simulator(n) =
           OpCUnmov(((s.COut, d0), (s.XOutPlus, d0), (s.XOutMinus, d0)),
                    ((s.CIn, d0 + 1), (s.XIn, d0 + 1)))
           |> ops.Add
+        | SplitDir.SDBuffer ->
+          s.Buffer
+          |> List.map (fun (x, y) -> (x, d0), (y, d0 + 1))
+          |> OpBuf
+          |> ops.Add
 
         for o in os do
           let d1 = depths.[o]
@@ -68,6 +74,7 @@ type Simulator(n) =
       let iv = indexByStorageVertex
       for op in ops ->
         match op with
+        | OpBuf(bs) -> OpBuf(bs |> List.map (fun (v, v') -> iv.[v], iv.[v']))
         | OpMov(v, v') -> OpMov(iv.[v], iv.[v'])
         | OpCMov((c, x), (c', p, m)) -> 
           OpCMov((iv.[c], iv.[x]), (iv.[c'], iv.[p], iv.[m]))
@@ -81,6 +88,7 @@ type Simulator(n) =
 #if CHECKS
     for op in ops do
       match op with
+      | OpBuf bs -> () // TODO
       | OpMov(v, v') -> storages.[v] |> ignore
       | OpCMov((vc, vx), (vc', vp, vm)) 
       | OpCUnmov((vc', vp, vm), (vc, vx)) -> 
@@ -96,6 +104,10 @@ type Simulator(n) =
     for op in ops do
       match op with
       | OpMov(v, v') -> storages'.[v'] <- storages.[v]
+      | OpBuf(bs) ->
+        for v, v' in bs do
+          storages.[v'] <- storages.[v]
+
       | OpCMov((vc, vx), (vc', vp, vm)) -> 
         let c = storages.[vc]
         storages'.[vc'] <- c
@@ -132,10 +144,10 @@ type Simulator(n) =
 
     getOutput()
 
-let evaluate' n xs =
+let evaluate n xs =
   Simulator(n).Evaluate xs
 
 open Propagator
-let evaluate n xs =
+let evaluate' n xs =
   Propagator(n, boolForward, boolBackward).Evaluate xs
 

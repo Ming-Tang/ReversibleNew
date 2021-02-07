@@ -54,11 +54,27 @@ let compose f g =
 
   let f', g' = ensureDisjoint f g
   let { Outputs = fo' }, { Inputs = gi' } = f', g'
-  let bridges = Seq.zip fo' gi' |> Map.ofSeq
+  let requireBuf = false
+  let requireBuf = not(Set.isEmpty f'.Gates) && not(Set.isEmpty g'.Gates)
+  // let requireBuf = true
+  let edges, gates = 
+    if requireBuf then
+      unionMap f'.Edges g'.Edges,
+      (
+        let s = Buffer (Seq.zip fo' gi' |> List.ofSeq)
+        in Set.add s (Set.union f'.Gates g'.Gates)
+      )
+    else
+      (
+        let bridges = Seq.zip fo' gi' |> Map.ofSeq
+        unionMap bridges (unionMap f'.Edges g'.Edges)
+      ),
+      Set.union f'.Gates g'.Gates
+
   {
     Vertices = Set.union f'.Vertices g'.Vertices
-    Edges = unionMap bridges (unionMap f'.Edges g'.Edges)
-    Gates = Set.union f'.Gates g'.Gates
+    Edges = edges
+    Gates = gates
     Inputs = f'.Inputs
     Outputs = g'.Outputs
   }
@@ -122,6 +138,14 @@ let multiplex n =
     Inputs = ins; Outputs = outs }
 
 let demultiplex n = multiplex n |> inverse
+
+let buffer n =
+  let inputs = Array.init n (fun i -> [$"bi{i}"; rs()])
+  let outputs = Array.init n (fun i -> [$"bo{i}"; rs()])
+  let vs = Seq.append inputs outputs |> Set.ofSeq
+  let s = Buffer(Seq.zip inputs outputs |> List.ofSeq)
+  { Vertices = vs; Edges = Map.empty; Gates = Set.singleton s
+    Inputs = List.ofArray inputs; Outputs = List.ofArray outputs }
 
 module Operators =
   let inline (~~) a = inverse a

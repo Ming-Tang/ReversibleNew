@@ -158,7 +158,7 @@ module ReversibleNetworkTests =
 
   [<Property>]
   let ``reverse: compose with its inverse``(Size a) =
-    (reverse a >>> reverse a) .=. identity a
+    (reverse a >>> reverse a) .=. buffer a
 
   [<Property>]
   let ``comm: length``(Size a, Size b) =
@@ -172,7 +172,7 @@ module ReversibleNetworkTests =
 
   [<Property>]
   let ``comm: composed with its inverse``(Size a, Size b) =
-    (comm a b >>> comm b a) .=. identity (a + b)
+    (comm a b >>> comm b a) .=. buffer (a + b)
 
   [<Property>]
   let ``rotate: inverse to substract``(Size a, Size b) =
@@ -182,17 +182,17 @@ module ReversibleNetworkTests =
   [<Property>]
   let ``rotate: sum property``(Size a, Size b, Size c) =
     let n = a + b + c
-    (rotate n a >>> rotate n b) .=. (rotate n (a + b))
+    (rotate n a >>> rotate n b) .=. (buffer n >>> rotate n (a + b))
 
   [<Property>]
   let ``rotate: difference property``(Size a, Size b, Size c) =
     let n = a + b + c
-    (rotate n a >>> rotate n (-b)) .=. (rotate n (a - b))
+    (rotate n a >>> rotate n (-b)) .=. compose (buffer n) (rotate n (a - b))
 
 [<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
 module ReversibleNetworkArithTests =
   open ReversibleArithTests
-  open ReversibleNetwork
+  // open ReversibleNetwork
   open ReversibleArith.Iso
   open ReversibleArith.NumIso
 

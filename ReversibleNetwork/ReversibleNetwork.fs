@@ -34,10 +34,11 @@ module Types =
 
   let empty =
     let ev = []
-    { CIn = ev; COut = ev; XIn = ev; XOutPlus = ev; XOutMinus = ev; Buffer = []
-      Dir = SplitDir.SDBuffer }
+    { CIn = ev; COut = ev; XIn = ev; XOutPlus = ev; XOutMinus = ev
+      Buffer = []; Dir = SplitDir.SDBuffer }
 
-  let inline splitToTuple { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd } =
+  let inline splitToTuple { CIn = cIn; COut = cOut; XIn = xIn
+                            XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd } =
     (cIn, cOut, xIn, xOutPlus, xOutMinus), sd
 
   let inline getBuffer { Buffer = b } = b
@@ -50,7 +51,8 @@ module Types =
   let inline Buffer b = { empty with Dir = SplitDir.SDBuffer; Buffer = b }
 
   let inline Split ((cIn, cOut, xIn, xOutPlus, xOutMinus), sd) = 
-    { CIn = cIn; COut = cOut; XIn = xIn; XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd; Buffer = [] }
+    { CIn = cIn; COut = cOut; XIn = xIn
+      XOutPlus = xOutPlus; XOutMinus = xOutMinus; Dir = sd; Buffer = [] }
 
 [<RequireQualifiedAccess>]
 module Gate =
