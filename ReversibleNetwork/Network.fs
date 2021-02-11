@@ -27,11 +27,10 @@ let makeGetAdjacents { Vertices = vs; Edges = es; Gates = ss; Outputs = outs } =
     else 
       None
       
-let private primarySimplify { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } =
+let private primarySimplify { Vertices = _; Edges = es; Gates = ss; Inputs = is; Outputs = os } =
   let stk = Stack(is)
   let vs' = HashSet()
   let es' = Dictionary()
-
   let gs = gatesDict ss
 
   while stk.Count > 0 do
@@ -47,7 +46,7 @@ let private primarySimplify { Vertices = vs; Edges = es; Gates = ss; Inputs = is
           let _, os, _ = gs.[v]
           Seq.iter stk.Push os
         elif not <| Seq.contains v os then
-          failwith $"simplify: Dead-end vertex ${v}"
+          failwith $"simplify: Dead-end vertex {v}"
       else
         es'.Add(v, v')
         stk.Push(v')

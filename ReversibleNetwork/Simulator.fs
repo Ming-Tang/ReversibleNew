@@ -65,8 +65,9 @@ type Simulator(n) =
     |> Array.ofSeq
 
   let indexByStorageVertex = 
-    seq { for i, v in Seq.indexed storageVertices -> v, i }
-    |> dict
+    seq { for i, v in Seq.indexed storageVertices -> KeyValuePair(v, i) }
+    |> Dictionary
+
   let n = storageVertices.Length
 
   let ops = 
@@ -126,9 +127,10 @@ type Simulator(n) =
 
     storages <- storages'
 
-  let setInput (xs : #seq<bool>) =
+  let setInput (xs : bool[]) =
     for x, v in Seq.zip xs is do
-      storages.[indexByStorageVertex.[(v, 0)]] <- x
+      let k : Vertex * int = v, 0
+      storages.[indexByStorageVertex.[k]] <- x
 
   let getOutput() =
     [| for v in os -> storages.[indexByStorageVertex.[(v, depths.[v])]] |]
@@ -144,10 +146,10 @@ type Simulator(n) =
 
     getOutput()
 
-let evaluate n xs =
+let evaluate' n xs =
   Simulator(n).Evaluate xs
 
 open Propagator
-let evaluate' n xs =
+let evaluate n xs =
   Propagator(n, boolForward, boolBackward).Evaluate xs
 

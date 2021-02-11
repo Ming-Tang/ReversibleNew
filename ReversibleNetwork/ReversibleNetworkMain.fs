@@ -56,45 +56,59 @@ let exportSymIso iso =
   File.WriteAllText("Output.md", $"\n$${s}$$\n")
 
 let exportGraphviz n =
-  let ds = getDepths n
-  let maxDepth = ds |> Seq.map ((|KeyValue|) >> snd) |> Seq.max
-  printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} gates={n.Gates.Count} maxDepth={maxDepth}"
+  async {
+    File.WriteAllText("output.svg", "")
+    let ds = getDepths n
+    let maxDepth = ds |> Seq.map ((|KeyValue|) >> snd) |> Seq.max
+    printfn $"vertices={n.Vertices.Count} edges={n.Edges.Count} gates={n.Gates.Count} maxDepth={maxDepth}"
 
-  let graphviz = 
-    n
-    |> toGraphviz (fun v -> $"""{String.concat "." v}:{ds.[v]}""") 
-    |> sprintf "%s"
-  File.WriteAllText("input.dot", graphviz)
-  let p = Process.Start("dot", "-Tsvg input.dot -o output.svg")
-  p.WaitForExit()
+    let graphviz = 
+      n
+      |> toGraphviz (fun v -> $"""{String.concat "." v}:{ds.[v]}""") 
+      |> sprintf "%s"
+    File.WriteAllText("input.dot", graphviz)
+    let p = Process.Start("dot", "-Tsvg input.dot -o output.svg")
+    p.WaitForExit()
+    return ()
+  }
+
+let bIsoToNetwork biso =
+  biso |> getSymIso |> FromIso.fromSymIso Network.simplify |> Network.canonicalize
 
 [<EntryPoint>]
 let main argv =
+#if X
+  let s = succNum B2 (succNum B2 (succDigit B2)) :> ISuccAddBuilder<_>
+  let f = s.PlusConst 3 |> bIsoToNetwork
+  let g = s.Neg |> bIsoToNetwork
+  let composed = 
+    Builders.multiplex 5
+    // let (>>>) = Builders.Operators.(>>>)
+    // (Builders.cond 5 2 f >>> Builders.cond 5 3 g)
+    |> Network.canonicalize
 
-  // let s = succDigit B5
-  let s = succNum B2 (succNum B2 (succDigit B2))
+  exportGraphviz composed
+  0
+#else
+
+  let s = succNum B2 (succNum B2 (succDigit B2)) :> ISuccAddBuilder<_>
   // let s = succNum B2 (succNum B2 (succNum B2 (succDigit B2)))
   // let s = succNum B5 (succNum B4 (succNum B4 (succDigit B6)))
 
-  let plusConst = 35
-  let pc = (s :> ISuccAddBuilder<_>).PlusConst plusConst
-  let neg = (s :> ISuccAddBuilder<_>).Neg
-  let add = (s :> ISuccAddBuilder<_>).AddMultiple 1
-  exportSymIso add
+  // let plusConst = 35
+  // let pc = s.PlusConst plusConst
+  // let neg = s.Neg
   // let iso = ReversibleArith.Iso.Operators.(>>>) pc neg
-  printfn "-"
-  let nAdd = 
-    add 
-    |> getSymIso 
-    |> FromIso.fromSymIso Network.simplify
-    |> Network.simplify
-    |> Network.canonicalize
 
-  // runNetwork s n (fun n -> $"-({n} + {plusConst})")
-  runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}, {b}")
-  exportGraphviz nAdd
-
+  let add = s.AddMultiple 3
+  // let add = s.Add
+  let nAdd = bIsoToNetwork add
+  runNetwork2 s nAdd (fun a b -> $"{a} + 3*{b}") (fun a b -> $"{a}")
+  let t = exportGraphviz nAdd |> Async.StartAsTask
+  exportSymIso add
+  t.Wait()
   printfn "-"
 
   0
+#endif
 

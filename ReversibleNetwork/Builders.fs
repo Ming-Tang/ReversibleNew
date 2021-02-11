@@ -13,7 +13,7 @@ let inverse f =
 [<AutoOpen>]
 module RandomString =
   let private rsLock = obj()
-  let mutable private _i = 0
+  let mutable private _i = 103
 
   /// Random string
   let rs() = 
@@ -79,29 +79,19 @@ let compose f g =
     Outputs = g'.Outputs
   }
 
-let forwardSplit =
-  let (c, c', x, xp, xm) as spl = ["ci"; rs()], ["co"; rs()], ["xi"; rs()], ["xp"; rs()], ["xm"; rs()]
-  {
-    Vertices = Set.ofList [c; c'; x; xp; xm]
-    Edges = Map.empty
-    Gates = Set.ofList [Split (spl, SplitDir.SDForward)]
-    Inputs = [c; x]
-    Outputs = [c'; xp; xm]
-  }
-
-let reverseSplit = inverse forwardSplit
-
 let fromPerm p =
   let sorted = Array.sort p
   let ascending = Array.init p.Length id
   if List.ofArray sorted <> List.ofArray ascending then
     invalidArg "p" $"fromPerm: invalid permutation: %A{p}"
 
-  let inputs = ascending |> Array.map (fun x -> [sprintf "p%d" x; rs()])
-  let outputs = ascending |> Array.map (fun x -> [sprintf "q%d" x; rs()])
+  let inputs = Array.init p.Length (fun i -> [$"p{i}"; rs()])
+  let outputs =  Array.init p.Length (fun i -> [$"q{i}"; rs()])
   let edges = 
-    inputs
-    |> Seq.mapi (fun i inp -> inp, outputs.[p.[i]]) 
+    seq {
+      for i, o in Seq.indexed outputs do
+        yield inputs.[p.[i]], o
+    }
     |> Map.ofSeq
 
   {
@@ -116,25 +106,38 @@ let identity n = fromPerm (Array.init n id)
 
 let reverse n = fromPerm (Array.init n (fun i -> i) |> Array.rev)
 
-let rotate n k = fromPerm (Array.init n (fun i -> (n + i + k % n) % n))
+let rotate n k = fromPerm (Array.init n (fun i -> (n + i - k % n) % n))
 
 let comm a b = fromPerm (Array.append [| a .. a + b - 1 |] [| 0 .. a - 1 |])
 
 let multiplex n =
   let inputs = Array.init n (fun i -> [$"xi{i}"; rs()])
+  let inputInterms = Array.init n (fun i -> [$"xiI{i}"; rs()])
   let outPs = Array.init n (fun i -> [$"xp{i}"; rs()])
   let outMs = Array.init n (fun i -> [$"xm{i}"; rs()])
+  let outPInterms = Array.init n (fun i -> [$"xpI{i}"; rs()])
+  let outMInterms = Array.init n (fun i -> [$"xmI{i}"; rs()])
   let ci, co = ["ci"; rs()], ["co"; rs()]
+  let cii, coi = ["ciI"; rs()], ["coI"; rs()]
   let interms = Array.init (n + 1) <| fun i -> 
-    if i = 0 then ci elif i = n then co else [$"cI{i}"; rs()]
+    if i = 0 then cii elif i = n then coi else [$"c_I{i}"; rs()]
 
   let ins = [ yield ci; yield! inputs ]
   let outs = [ yield co; yield! outPs; yield! outMs ]
-  let vs = Seq.concat [inputs; outPs; outMs; interms] |> Set.ofSeq
+  let vs = Seq.concat [inputs; inputInterms; outPs; outMs; outPInterms; outMInterms; interms; [|ci; co|]] |> Set.ofSeq
   let gs = Array.init n <| fun i -> 
-    Split((interms.[i], interms.[i + 1], inputs.[i], outPs.[i], outMs.[i]), SplitDir.SDForward)
+    Split((interms.[i], interms.[i + 1], inputInterms.[i], outPInterms.[i], outMInterms.[i]), SplitDir.SDForward)
 
-  { Vertices = vs; Edges = Map.empty; Gates = Set.ofArray gs
+  let es = 
+    seq {
+      yield ci, cii
+      yield coi, co
+      for xs, ys in [inputs, inputInterms; outPInterms, outPs; outMInterms, outMs] do
+        yield! Seq.zip xs ys
+    }
+    |> Map.ofSeq
+
+  { Vertices = vs; Edges = es; Gates = Set.ofArray gs
     Inputs = ins; Outputs = outs }
 
 let demultiplex n = multiplex n |> inverse
@@ -153,15 +156,15 @@ module Operators =
   let inline (&&&) a b = stack a b
 
 open Operators
-let cond n i (f : Network) = 
+let cond n j (f : Network) = 
   let m = f.Inputs.Length
   if m <> f.Outputs.Length then
     invalidArg "f" "cond: mismatch arity"
 
-  let pToLast = fromPerm [| yield! seq { 0 .. i - 1 }; yield! { i + 1 .. n - 1 }; yield i |]
-  let pre = pToLast &&& identity m
+  let pre = (prefix ["a"] (identity j)) &&& (prefix ["b"] <| comm 1 (n - j - 1)) &&& (prefix ["c"] <| identity m)
+  let post = ~~pre
   let body = multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
-  pre >>> (identity (n - 1) &&& body) >>> ~~pre
+  pre >>> (identity (n - 1) &&& body) >>> post
 
 let rec repeat i (f : Network) =
   let m = f.Inputs.Length
