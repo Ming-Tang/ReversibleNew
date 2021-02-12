@@ -50,12 +50,25 @@ let stack f g =
 let compose f g =
   let { Outputs = fo }, { Inputs = gi } = f, g
   if fo.Length <> gi.Length then
-    invalidArg "f" $"compose: requires conformable outputs/inputs: {fo.Length} != {gi.Length}"
+    invalidArg (nameof f) $"compose: requires conformable outputs/inputs: {fo.Length} != {gi.Length}"
 
   let f', g' = ensureDisjoint f g
   let { Outputs = fo' }, { Inputs = gi' } = f', g'
+  let outToIn = Seq.zip fo' gi' |> dict
+  let func = (fun v -> if outToIn.ContainsKey v then outToIn.[v] else v)
+  let f' = renameDict outToIn f'
+  // let g' = rename func g'
+#if P || !P
+  {
+    Vertices = Set.union f'.Vertices g'.Vertices
+    Edges = unionMap f'.Edges g'.Edges
+    Gates = Set.union f'.Gates g'.Gates
+    Inputs = f'.Inputs
+    Outputs = g'.Outputs
+  }
+#else
   let requireBuf = false
-  let requireBuf = not(Set.isEmpty f'.Gates) && not(Set.isEmpty g'.Gates)
+  // let requireBuf = not(Set.isEmpty f'.Gates) && not(Set.isEmpty g'.Gates)
   // let requireBuf = true
   let edges, gates = 
     if requireBuf then
@@ -78,19 +91,31 @@ let compose f g =
     Inputs = f'.Inputs
     Outputs = g'.Outputs
   }
+#endif
 
 let fromPerm p =
   let sorted = Array.sort p
   let ascending = Array.init p.Length id
   if List.ofArray sorted <> List.ofArray ascending then
-    invalidArg "p" $"fromPerm: invalid permutation: %A{p}"
+    invalidArg (nameof p) $"fromPerm: invalid permutation: %A{p}"
 
+#if P || !P
   let inputs = Array.init p.Length (fun i -> [$"p{i}"; rs()])
-  let outputs =  Array.init p.Length (fun i -> [$"q{i}"; rs()])
+  let outputs = [ for i in 0 .. inputs.Length - 1 -> inputs.[p.[i]] ]
+  {
+    Vertices = Set.ofSeq (Seq.append inputs outputs)
+    Edges = Map.empty
+    Gates = Set.empty
+    Inputs = List.ofArray inputs
+    Outputs = outputs
+  }
+#else
+  let inputs = Array.init p.Length (fun i -> [$"p{i}"; rs()])
+  let outputs = Array.init p.Length (fun i -> [$"q{i}"; rs()])
   let edges = 
     seq {
-      for i, o in Seq.indexed outputs do
-        yield inputs.[p.[i]], o
+      for i, o in Seq.indexed outputs ->
+        inputs.[p.[i]], o
     }
     |> Map.ofSeq
 
@@ -101,6 +126,7 @@ let fromPerm p =
     Inputs = List.ofArray inputs
     Outputs = List.ofArray outputs
   }
+#endif
 
 let identity n = fromPerm (Array.init n id)
 
@@ -156,20 +182,23 @@ module Operators =
   let inline (&&&) a b = stack a b
 
 open Operators
-let cond n j (f : Network) = 
+let cond n i (f : Network) = 
   let m = f.Inputs.Length
   if m <> f.Outputs.Length then
-    invalidArg "f" "cond: mismatch arity"
+    invalidArg (nameof f) "cond: mismatch arity"
 
-  let pre = (prefix ["a"] (identity j)) &&& (prefix ["b"] <| comm 1 (n - j - 1)) &&& (prefix ["c"] <| identity m)
-  let post = ~~pre
+  if i >= n || i < 0 then
+    invalidArg (nameof i) "cond: out of range"
+
+  let pre = identity i &&& comm 1 (n - i - 1) &&& identity m
+  let post = identity i &&& comm (n - i - 1) 1 &&& identity m
   let body = multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
   pre >>> (identity (n - 1) &&& body) >>> post
 
 let rec repeat i (f : Network) =
   let m = f.Inputs.Length
   if m <> f.Outputs.Length then
-    invalidArg "f" "repeat: mismatch arity"
+    invalidArg (nameof f) "repeat: mismatch arity"
 
   let rec rep i =
     match i with
@@ -181,7 +210,8 @@ let rec repeat i (f : Network) =
 
 let condRepeat n f =
   seq {
-    for i in 0 .. n - 1 -> cond n i (repeat i f)
+    for i in 0 .. n - 1 ->
+      cond n i (repeat i f)
   }
   |> Seq.reduce (>>>)
 

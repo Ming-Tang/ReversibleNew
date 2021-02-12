@@ -93,11 +93,11 @@ module Gate =
 
   let inline fromList sd xs =
     match sd with
-    | SplitDir.SDBuffer -> invalidArg "sd" "Gate.fromList: cannot be SDBuffer"
+    | SplitDir.SDBuffer -> invalidArg (nameof sd) "Gate.fromList: cannot be SDBuffer"
     | _ ->
       match xs with 
       | [a; b; c; d; e] -> Split((a, b, c, d, e), sd)
-      | _ -> invalidArg "xs" "Split.fromList: length != 5"
+      | _ -> invalidArg (nameof xs) "Split.fromList: length != 5"
 
   let inline toList s =
     match s with

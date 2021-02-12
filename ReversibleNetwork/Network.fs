@@ -27,16 +27,18 @@ let makeGetAdjacents { Vertices = vs; Edges = es; Gates = ss; Outputs = outs } =
     else 
       None
       
-let private primarySimplify { Vertices = _; Edges = es; Gates = ss; Inputs = is; Outputs = os } =
+let private primarySimplify { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } =
   let stk = Stack(is)
-  let vs' = HashSet()
-  let es' = Dictionary()
+  let mutable vs' = Set.empty
+  let vs'' = HashSet(vs.Count)
+  let mutable es' = Map.empty
   let gs = gatesDict ss
 
   while stk.Count > 0 do
     let v = stk.Pop()
-    if not <| vs'.Contains(v) then
-      vs'.Add(v) |> ignore
+    if not <| vs''.Contains(v) then
+      vs' <- Set.add v vs'
+      vs''.Add(v) |> ignore
       let mutable v' = v
       while es.ContainsKey(v') do
         v' <- es.[v']
@@ -48,11 +50,12 @@ let private primarySimplify { Vertices = _; Edges = es; Gates = ss; Inputs = is;
         elif not <| Seq.contains v os then
           failwith $"simplify: Dead-end vertex {v}"
       else
-        es'.Add(v, v')
+        // es'.Add(v, v')
+        es' <- es'.Add(v, v')
         stk.Push(v')
           
   {
-    Vertices = Set.ofSeq vs'
+    Vertices = vs'
     Edges = es' |> Seq.map (|KeyValue|) |> Map.ofSeq
     Gates = ss
     Inputs = is
@@ -125,13 +128,14 @@ let refUses { Edges = es; Gates = ss; Inputs = is; Outputs = os } : Vertex Set =
 
     for s in ss do
       yield! Gate.toList s
+
+    yield! is
+    yield! os
   }
 
 let refSources { Vertices = vs; Gates = ss; Inputs = is; Outputs = os } : Vertex Set =
   Set.ofSeq <| seq {
     yield! vs
-    yield! is
-    yield! os
   }
 
 let names n = Set.union (refSources n) (refUses n)
@@ -143,7 +147,26 @@ let rename f { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os 
   let mf = List.map f
   let es' = es |> Seq.map (fun (KeyValue(k, v)) -> f k, f v) |> Map.ofSeq
   let ss' = Set.map (Gate.map f) ss
-  { Vertices = Set.map f vs; Edges = es'; Gates = ss'; Inputs = mf is; Outputs = mf os }
+  {
+    Vertices = Set.map f vs
+    Edges = es'
+    Gates = ss'
+    Inputs = mf is
+    Outputs = mf os 
+  }
+
+let renameDict (d : #IDictionary<_, _>) { Vertices = vs; Edges = es; Gates = ss; Inputs = is; Outputs = os } =
+  let f v = if d.ContainsKey v then d.[v] else v
+  let mf = List.map f
+  let es' = es |> Seq.map (fun (KeyValue(k, v)) -> f k, f v) |> Map.ofSeq
+  let ss' = Set.map (Gate.map f) ss
+  {
+    Vertices = vs - Set.ofSeq d.Keys + Set.ofSeq d.Values
+    Edges = es'
+    Gates = ss'
+    Inputs = mf is
+    Outputs = mf os 
+  }
 
 let prefix (p : Vertex) = rename (fun n -> p @ n)
 
@@ -156,6 +179,7 @@ let checkPrefixes (n1 : Prefix) (n2 : Prefix) =
 let relabel ({ Inputs = is; Outputs = os; Vertices = vs } as n) = 
   let is, os = Array.ofList is, Array.ofList os
   let vs' = Array.ofSeq (vs - Set.ofArray is - Set.ofArray os)
+  let vi = Seq.indexed vs' |> Seq.map (fun (i, v) -> v, i) |> dict
   let fmt = String.replicate (vs'.Length.ToString().Length) "0"
   let pad i = (i : int).ToString(fmt)
   let memo = Dictionary()
@@ -168,7 +192,7 @@ let relabel ({ Inputs = is; Outputs = os; Vertices = vs } as n) =
         | None ->
           match Array.tryFindIndex ((=) name) os with
           | None ->
-            let i = Array.findIndex ((=) name) vs'
+            let i = vi.[name] 
             [$"v{pad i}"]
           | Some j ->
             [$"o{pad j}"]

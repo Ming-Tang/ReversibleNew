@@ -21,7 +21,7 @@ let main argv =
   let addn = (s :> ISuccAddBuilder<_>).Add
   let pcn = (s :> ISuccAddBuilder<_>).PlusConst(47)
 
-  let multn = (s'' :> ISuccAddBuilder<_>).Mult''(s', s)
+  let multn = (s'' :> ISuccAddBuilder<_>).MultB2(s', s)
   printfn "%A" <| numberValue (Num(Digit(2, B10), Num(Digit(3, B10), Digit(4, B10))))
   printfn "%A" <| (add B10 <<| (Digit(7, B10), Digit(6, B10)))
   printfn "%A" <| (mult B10 <<| ((Digit(2, B10), Digit(3, B10)), Digit(4, B10)))

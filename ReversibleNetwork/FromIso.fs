@@ -28,7 +28,8 @@ let fromSymIso simplify f =
     | SFunc f -> fromFunc f
     | SPFunc(PFRep n, [SFunc (FSucc n')]) when n = n' -> 
       seq {
-        for i in 0 .. n - 1 -> cond n i (rotate n i)
+        for i in 0 .. n - 1 ->
+          cond n i (rotate n i)
       }
       |> Seq.rev
       |> Seq.reduce (>>>)
@@ -46,6 +47,6 @@ let fromSymIso simplify f =
     | SCompose([]) -> failwith "fromSymIso: empty compose"
     | SCompose xs -> List.map recurse xs |> List.reduce (>>>)
     | SPFunc(_, _) as f -> failwith $"fromSymIso: invalid SPFunc: %A{f}"
-    |> simplify
+    // |> simplify
 
   recurse f

@@ -77,18 +77,25 @@ let bIsoToNetwork biso =
 
 [<EntryPoint>]
 let main argv =
-#if X
-  let s = succNum B2 (succNum B2 (succDigit B2)) :> ISuccAddBuilder<_>
-  let f = s.PlusConst 3 |> bIsoToNetwork
-  let g = s.Neg |> bIsoToNetwork
-  let composed = 
-    Builders.multiplex 5
-    // let (>>>) = Builders.Operators.(>>>)
-    // (Builders.cond 5 2 f >>> Builders.cond 5 3 g)
-    |> Network.canonicalize
-
-  exportGraphviz composed
+#if X || !X
+  printfn "n, sG, sV, aG, aV, mG, mV"
+  for n in 1 .. 16 do
+    let xs = Array.init n (fun _ -> 2) |> List.ofArray
+    let s = succFromList xs
+    let arr =
+      [|
+        async { return bIsoToNetwork s.Succ' }
+        async { return bIsoToNetwork s.Add' }
+        async { return bIsoToNetwork s.Mult' }
+      |]
+      |> Async.Parallel
+      |> Async.RunSynchronously
+    let succ, add, mult = arr.[0], arr.[1], arr.[2]
+    printfn $"{n}, {succ.Gates.Count}, {succ.Vertices.Count}, {add.Gates.Count}, {add.Vertices.Count}, {mult.Gates.Count}, {mult.Vertices.Count}"
+    ()
+   
   0
+
 #else
 
   let s = succNum B2 (succNum B2 (succDigit B2)) :> ISuccAddBuilder<_>
@@ -100,10 +107,10 @@ let main argv =
   // let neg = s.Neg
   // let iso = ReversibleArith.Iso.Operators.(>>>) pc neg
 
-  let add = s.AddMultiple 3
-  // let add = s.Add
+  //let add = s.AddMultiple 3
+  let add = s.Add
   let nAdd = bIsoToNetwork add
-  runNetwork2 s nAdd (fun a b -> $"{a} + 3*{b}") (fun a b -> $"{a}")
+  runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
   let t = exportGraphviz nAdd |> Async.StartAsTask
   exportSymIso add
   t.Wait()

@@ -39,7 +39,13 @@ type Propagator<'v>(n, forward, backward) =
   let reset() =
     q.Clear()
     states <- Dictionary(seq { for v in vs -> KeyValuePair(v, None) })
-    ss <- getSS()
+
+    if ss.Count = 0 then
+      ss <- getSS()
+    else
+      for KeyValue(_, v) in ss do
+        fst (fst v) := 0
+
     Seq.iter push is
 
   let getOut() =
@@ -49,10 +55,6 @@ type Propagator<'v>(n, forward, backward) =
 
   let VISITED = -1
   let fill v value =
-    if List.head v = "v159" then
-      let x = 1
-      ()
-
     if filled v then
       failwith $"already filled: states.[{v}] = {states.[v]}"
     if ss.ContainsKey(v) then

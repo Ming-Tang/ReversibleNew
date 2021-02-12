@@ -299,7 +299,7 @@ module IsoTests =
   [<Property>]
   let ``addMultiple k (m, n) = (m + k * n mod B, n): different bases (B = base M)``(Num2 m, Num1 n, k : int) =
     let num1, num2, b = numberValue m, numberValue n, modValue m
-    let add = (succNum1 :> ISuccAddBuilder<_>).AddMultiple'(succNum2, k)
+    let add = (succNum1 :> ISuccAddBuilder<_>).AddMultipleB(succNum2, k)
     let expected = (num1 + ((k * num2 + b) % b) + b) % b, num2
     let actual1, actual2 = add <<| (m, n)
     let actual = numberValue actual1, numberValue actual2
@@ -377,7 +377,7 @@ module IsoTests =
   [<Property>]
   let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases``(Num1 a, Num1 m, Num2 n) =
     let num0, num1, num2 = numberValue a, numberValue m, numberValue n
-    let mult = (succNum2 :> ISuccAddBuilder<_>).Mult'(succNum1)
+    let mult = (succNum2 :> ISuccAddBuilder<_>).MultB(succNum1)
     let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
     let actual0, (actual1, actual2) = mult <<| (a, (m, n))
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)
@@ -386,7 +386,7 @@ module IsoTests =
   [<Property>]
   let ``mult(a, m, n) = (a + m * n mod B, m, n): different bases 2``(Num1 a, Num2 m, Num2 n) =
     let num0, num1, num2 = numberValue a, numberValue m, numberValue n
-    let mult = (succNum2 :> ISuccAddBuilder<_>).Mult''(succNum2, succNum1)
+    let mult = (succNum2 :> ISuccAddBuilder<_>).MultB2(succNum2, succNum1)
     let expected = (num0 + num1 * num2) % modValue a, (num1, num2)
     let actual0, (actual1, actual2) = mult <<| (a, (m, n))
     let actual = numberValue actual0, (numberValue actual1, numberValue actual2)

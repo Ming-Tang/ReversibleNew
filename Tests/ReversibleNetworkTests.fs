@@ -130,6 +130,18 @@ module ReversibleNetworkTests =
     Network.brokenRefs n = (Set.empty, Set.empty)
 
   [<Property>]
+  let ``identity 0: right compose``(ComposedNetwork n) =
+    n .=. (n &&& identity 0)
+
+  [<Property>]
+  let ``identity 0: left compose``(ComposedNetwork n) =
+    n .=. (identity 0 &&& n)
+
+  [<Property>]
+  let ``identity 0 equal to empty perm``(ComposedNetwork n) =
+    identity 0 .=. fromPerm [||]
+
+  [<Property>]
   let ``No broken refs: canonicalize``(ComposedNetwork n) =
     Network.brokenRefs (Network.relabel n) = (Set.empty, Set.empty)
 
@@ -146,18 +158,12 @@ module ReversibleNetworkTests =
     Network.canonicalize (Network.canonicalize n) .=. Network.canonicalize n
 
   [<Property>]
+  let ``inverse: operator``(ComposedNetwork n) =
+    inverse n .=. ~~n
+
+  [<Property>]
   let ``inverse: double inverse``(ComposedNetwork n) =
     inverse (inverse n) .=. n
-
-#if FALSE
-  [<Property>]
-  let ``inverse: composition = identity A``(ComposedNetwork n) =
-    (n >>> (inverse n)) .=. identity n.Inputs.Length
-
-  [<Property>]
-  let ``inverse: composition = identity B``(ComposedNetwork n) =
-    (inverse n >>> n) .=. identity n.Inputs.Length
-#endif
 
   [<Property>]
   let ``reverse: self-inverse``(Size a) =
@@ -334,10 +340,9 @@ module ReversibleNetworkMultiplexTests =
     let input = [| yield a; yield b; yield c; yield! ps; yield! xs |]
     input = eval (md >>> md) input
 
-[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
-module ReversibleNetworkArithTests =
+[<AutoOpen>]
+module Helpers =
   open ReversibleArithTests
-  // open ReversibleNetwork
   open ReversibleArith.Iso
   open ReversibleArith.NumIso
 
@@ -361,33 +366,11 @@ module ReversibleNetworkArithTests =
     let res = Simulator.evaluate n arr
     intPairFromBools (s, s') res
 
-  let succ = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Succ
-  let nSucc = bIsoToNetwork succ 
-  let neg = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Neg
-  let nNeg = bIsoToNetwork neg 
-  [<Property>]
-  let ``succ n = n + 1 mod B``(Num1 n) =
-    let num, m = numberValue n, modValue n
-    let expected = (num + 1) % m
-    let actual = eval nSucc IsoTests.succNum1 n
-    expected = actual
-
-  [<Property>]
-  let ``repeat: n = succ^k(pred^k(n))``(Num1 n, Size k) =
-    let num, m = numberValue n, modValue n
-    let k = k % 5
-    let expected = num % m
-    let actual = eval (repeat k nSucc >>> ~~(repeat k nSucc)) IsoTests.succNum1 n
-    expected = actual
-
-  [<Property>]
-  let ``repeat: n = compl^k(compl^-k(n))``(Num0 n, Size k) =
-    let num, m = numberValue n, modValue n
-    let k = k % 5
-    let expected = num % m
-    let nPerm = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
-    let actual = eval (repeat k nPerm >>> ~~(repeat k nPerm)) IsoTests.succNum0 n
-    expected = actual
+[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
+module ReversibleNetworkArithCondTests =
+  open ReversibleArithTests
+  open ReversibleArith.Iso
+  open ReversibleArith.NumIso
 
   [<Property>]
   let ``cond: compose property (same)``(Num0 a, Num0 b, Size i) =
@@ -528,10 +511,9 @@ module ReversibleNetworkArithTests =
     let s = Network.simplify
     (s (cond n i f) >>> s (cond n j g)), (s (cond n j g) >>> s (cond n i f))
 
-#if FALSE
   [<Property>]
   let ``cond: compose property (effectively permutations)``(Num1 a, Num1 b, Size i, Size j) =
-    let n = modValue a
+    let n = List.sum (getBases a)
     let i, j = i % n, j % n
     if i = j then
       false ==> false
@@ -544,7 +526,7 @@ module ReversibleNetworkArithTests =
 
   [<Property>]
   let ``cond: compose property (effectively identity 2)``(Num1 a, Num1 b, Size i, Size j) =
-    let n = modValue a
+    let n = List.sum (getBases a)
     let i, j = i % n, j % n
     if i = j then
       false ==> false
@@ -564,8 +546,8 @@ module ReversibleNetworkArithTests =
 
   [<Property>]
   let ``cond: compose property (different, intermediate identity)``(Num0 a, Num0 b, Size i, Size j, Size k) =
-    let n = modValue a
-    let i, j = i % n, j % n
+    let n = List.sum (getBases a)
+    let i, j, k = i % n, j % n, k % n
     if i = j then
       false ==> false
     else
@@ -573,7 +555,6 @@ module ReversibleNetworkArithTests =
       let expected = eval2 ne IsoTests.succNum0 (a, b)
       let actual = eval2 na IsoTests.succNum0 (a, b)
       true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
-#endif
 
   [<Property>]
   let ``cond: compose property (double eval)``(Num0 a, Num0 b, Size i, Size j) =
@@ -625,6 +606,40 @@ module ReversibleNetworkArithTests =
       let expected = (numberValue a, numberValue b)
       let actual = eval2' ni (IsoTests.succBool, IsoTests.succNum0) (a, b)
       true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
+
+[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
+module ReversibleNetworkArithTests =
+  open ReversibleArithTests
+  open ReversibleArith.NumIso
+
+  let succ = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Succ
+  let nSucc = bIsoToNetwork succ 
+  let neg = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Neg
+  let nNeg = bIsoToNetwork neg 
+
+  [<Property>]
+  let ``succ n = n + 1 mod B``(Num1 n) =
+    let num, m = numberValue n, modValue n
+    let expected = (num + 1) % m
+    let actual = eval nSucc IsoTests.succNum1 n
+    expected = actual
+
+  [<Property>]
+  let ``repeat: n = succ^k(pred^k(n))``(Num1 n, Size k) =
+    let num, m = numberValue n, modValue n
+    let k = k % 5
+    let expected = num % m
+    let actual = eval (repeat k nSucc >>> ~~(repeat k nSucc)) IsoTests.succNum1 n
+    expected = actual
+
+  [<Property>]
+  let ``repeat: n = compl^k(compl^-k(n))``(Num0 n, Size k) =
+    let num, m = numberValue n, modValue n
+    let k = k % 5
+    let expected = num % m
+    let nPerm = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let actual = eval (repeat k nPerm >>> ~~(repeat k nPerm)) IsoTests.succNum0 n
+    expected = actual
 
   [<Property>]
   let ``neg n = -n mod B``(Num1 n) =

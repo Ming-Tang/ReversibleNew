@@ -4,14 +4,19 @@ open System.Text.RegularExpressions
 module Widths =
   open System
   open System.Collections.Generic
+
   let widths : Dictionary<Type, int> = Dictionary()
   let add t i = widths.[t] <- i
   let rec get (t : Type) = 
     if widths.ContainsKey(t) then
       Some widths.[t]
-    elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<unit * unit> then
+    elif t.IsGenericType && (t.GetGenericTypeDefinition() = typedefof<unit * unit> || t.Name = "SuccNum`2" || t.Name = "Num`2") then
         match t.GetGenericArguments() with
         | [| a; b |] -> Option.map2 (+) (get a) (get b)
+        | _ -> None
+    elif t.IsGenericType && t.Name = "Digit`1" then
+        match t.GetGenericArguments() with
+        | [| a |] -> get a
         | _ -> None
     else
       None
@@ -196,6 +201,6 @@ let repConst n f =
   repConst' n
   |> group (sprintf "repConst(%d, \\ldots)" n)
 
-let cast : BIso<'a, 'b> = fun _ ->
-  Iso(box >> unbox, box >> unbox, lazy SFunc(FId None))
+let cast w : BIso<'a, 'b> = fun _ ->
+  Iso(box >> unbox, box >> unbox, lazy SFunc(FId w))
 
