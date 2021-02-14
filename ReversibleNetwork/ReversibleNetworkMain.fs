@@ -77,7 +77,7 @@ let bIsoToNetwork biso =
 
 [<EntryPoint>]
 let main argv =
-#if X || !X
+#if X && !X
   let n = Builders.mcond [3, 10; 7, 10] (Builders.buffer 5) |> Network.canonicalize
   // let n = Builders.cond 10 3 (Builders.cond 10 7 <| Builders.buffer 5) |> Network.canonicalize
   let t = exportGraphviz n |> Async.StartAsTask

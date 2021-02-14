@@ -1,5 +1,4 @@
 ﻿module ReversibleNetwork.FromIso
-// open ReversibleNetwork.Network
 open ReversibleArith.Iso
 open Builders
 open Builders.Operators
@@ -15,16 +14,43 @@ let fromFunc x =
   | FAssoc(Some(a, b, c)) -> identity (a + b + c)
   | FId _ | FComm _ | FAssoc _ -> failwith $"fromSymIsoFunc: Missing size: %A{x}"
 
+let isIdentity f =
+  match f with
+  | SFunc (FId _) | SSym (SFunc (FId _)) -> true
+  | _ -> false
+
+let rec (|MultiCond|_|) f =
+  match f with
+  | SPFunc(PFCond(i, n), [f]) -> Some ([n, i, None], f)
+  | SPFunc(PFCond(i0, n0), [MultiCond(ns, f)]) -> Some ((n0, i0, None) :: ns, f)
+  | _ -> None
+
 let fromPFunc x f =
   match x with
   | PFRep n -> condRepeat n f
   | PFCond(i, n) -> cond n i f
-  | PFCondLast n  -> cond n (n - 1) f
+  | PFCondLast n -> cond n (n - 1) f
+
+let rec preSimplify f =
+  match f with
+  | SSym f -> SSym (preSimplify f)
+  | SPair(a, b) -> preSimplify (SPair(a, b))
+  | SCompose [] -> SCompose []
+  | SCompose [a] -> preSimplify a
+  | SCompose ((x :: _) as xs) -> 
+    let c' = SCompose (List.filter (isIdentity >> not) xs) 
+    match c' with
+    | SCompose [] -> x
+    | _ -> c'
+  | SGroup(_, g) -> preSimplify g
+  | SFunc _ -> f
+  | SPFunc(p, fs) -> SPFunc(p, List.map preSimplify fs)
 
 let fromSymIso simplify f =
   let rec recurse f =
     match f with
-    | SGroup(n, g) -> recurse g
+    | MultiCond(ps & (_ :: _ :: _), f) -> mcond ps (recurse f)
+    | SGroup(_, g) -> recurse g
     | SFunc f -> fromFunc f
     | SPFunc(PFRep n, [SFunc (FSucc n')]) when n = n' -> 
       seq {
@@ -44,9 +70,9 @@ let fromSymIso simplify f =
     | SPair(a, b) -> recurse a &&& recurse b
     | SCompose [x; y] -> recurse x >>> recurse y
     | SCompose [x] -> recurse x
-    | SCompose([]) -> failwith "fromSymIso: empty compose"
+    | SCompose [] -> failwith "fromSymIso: empty compose"
     | SCompose xs -> List.map recurse xs |> List.reduce (>>>)
     | SPFunc(_, _) as f -> failwith $"fromSymIso: invalid SPFunc: %A{f}"
-    // |> simplify
 
-  recurse f
+  recurse (preSimplify f)
+

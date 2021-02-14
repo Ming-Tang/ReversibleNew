@@ -51,8 +51,10 @@ module Builders =
   type SuccBuilder<'b when 'b :> INum> =
     abstract member Succ : BIso<'b, 'b>
     abstract member SuccRest : int -> BIso<'b, 'b>
-    abstract member Prop : BIso<'b, 'b>
-    abstract member SuccP : BIso<'b, 'b>
+
+  type HSuccBuilder<'n, 'b1, 'n1 when 'n :> INum and 'b1 :> IBase and 'b1 : equality and 'n1 :> INum> =
+    abstract member SuccA : BIso<'n, Digit<'b1> * 'n1>
+    abstract member SuccB : BIso<Digit<'b1> * 'n1, 'n>
 
   type AddBuilder<'b when 'b :> INum> =
     abstract member Add : BIso<'b * 'b, 'b * 'b>
@@ -148,13 +150,8 @@ module Builders =
     (cast w &&& (cast w &&& cast w)) >>> f >>> ~~(cast w &&& (cast w &&& cast w))
 
   type SuccDigit<'b when 'b :> IBase> = SuccDigit of 'b with
-    interface ICase with
-      member d.Case ch = match d with SuccDigit b -> ch.SuccDigit<'b> b
-
     interface ISuccAddBuilder<Digit<'b>> with
       member d.FromDigits ds = match d with SuccDigit b -> (Digit(0, b) :> IFromDigits<_>).FromDigits ds
-      member d.SuccP = match d with SuccDigit b -> succ b
-      member d.Prop = id
       member d.Succ = match d with SuccDigit b -> succ b
       member d.SuccRest n = let d = d :> ISuccAddBuilder<_> in if n <= 0 then d.Succ else id
       member d.Add = match d with SuccDigit b -> rep' b (succ b)
@@ -184,11 +181,7 @@ module Builders =
     interface INumFromList with
       member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
 
-  and SuccNum<'b, 'n when 'b :> IBase and 'n :> INum and 'b : equality> = SuccNum of 'b * ISuccAddBuilder<'n> with
-    interface ICase with
-      member s.Case ch =
-        let (SuccNum (b, s')) = s in ch.SuccNum<'b, 'n>(b, s')
-
+  type SuccNum<'b, 'n when 'b :> IBase and 'n :> INum and 'b : equality> = SuccNum of 'b * ISuccAddBuilder<'n> with
     interface ISuccAddBuilder<Num<'b, 'n>> with
       member d.FromDigits ds = 
         let (SuccNum(b, x)) = d
@@ -198,42 +191,10 @@ module Builders =
           let d1 = (Digit(0, b) :> IFromDigits<_>).FromDigits [d0]
           Num(d1, (x :> IFromDigits<_>).FromDigits(ds'))
 
-      member s.SuccP = 
-        let (SuccNum (b, _)) = s
-        let s = s :> ISuccAddBuilder<_>
-        let num = num s
-        (sym num >>> (succ b &&& id) >>> num >>> s.Prop)
-        |> group (sprintf "succP(%s)" <| basesName s)
-
-      member s.Prop =
-        let (SuccNum (b, s' : ISuccAddBuilder<'n>)) = s
-        let num0 = num (s :> ISuccAddBuilder<_>)
-        let ch = 
-          {
-            new CaseHandler<BIso<Digit<'b> * 'n, Digit<'b> * 'n>> with
-            member ch.SuccDigit<'b1 when 'b1 :> IBase>(b1 : 'b1) =
-              let sd = (SuccDigit b1 :> ISuccAddBuilder<_>).Succ |> box |> unbox
-              cond (Digit(0, b)) sd
-
-            member ch.SuccNum<'b1, 'n1 when 'b1 :> IBase and 'n1 :> INum and 'b1 : equality>(b1 : 'b1, xs : ISuccAddBuilder<'n1>) =
-              let w = Some(List.sum <| getBases s')
-              let sn = SuccNum(b1, xs) :> ISuccAddBuilder<Num<'b1, 'n1>>
-              let num' : BIso<_, Num<'b1, 'n1>> = num (sn :?> ISuccAddBuilder<'n>)
-              let c1 = cond (Digit(0, b)) (succ b1)
-              let condSucc = sym assoc >>> (c1 &&& id) >>> assoc
-              (id &&& (cast w >>> sym num')) >>> condSucc >>> (id &&& (num' >>> cast w))
-          }
-        (sym num0 >>> (s' :?> ICase).Case(ch) >>> (id &&& s'.Prop) >>> num0)
-        |> group (sprintf "prop(%s)" <| basesName s)
-
       member s.Succ = 
-        #if P && !P
-        (s :> ISuccAddBuilder<_>).SuccP
-        #else
         let (SuccNum (b, s')) = s
         let num = num (s :> ISuccAddBuilder<_>)
-        (sym num >>> condLast b s'.Succ >>> (succ b &&& id) >>> num)
-        #endif
+        (sym num >>> (succ b &&& id) >>> (cond (Digit(0, b)) s'.Succ) >>> num)
         |> group (sprintf "succ(%s)" <| basesName s)
 
       member s.SuccRest n =
@@ -309,14 +270,6 @@ module Builders =
 
     interface INumFromList with
       member d.NumFromList xs = (d :> ISuccAddBuilder<_>).NumFromList xs :> _
-
-  and CaseHandler<'r> =
-    // Invariant: SuccDigit b = same type of this
-    abstract member SuccDigit<'b when 'b :> IBase> : b : 'b -> 'r
-    // Invariant: SuccNum(b, n) = same type of this
-    abstract member SuccNum<'b, 'n when 'b :> IBase and 'n :> INum and 'b : equality> : b : 'b * n : ISuccAddBuilder<'n> -> 'r
-  and ICase =
-    abstract member Case : CaseHandler<'r> -> 'r
 
   let succDigit (b : 't when 't :> IBase) = 
     let sd = SuccDigit b

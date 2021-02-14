@@ -381,7 +381,7 @@ module Helpers =
   let eval' n arr =
     Simulator.evaluate (Network.canonicalize n) arr
 
-[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 200)>]
+[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
 module ReversibleNetworkArithCondTests =
   open ReversibleArithTests
   open ReversibleArith.NumIso
@@ -618,7 +618,29 @@ module ReversibleNetworkArithCondTests =
     let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
     let f = f >>> g
     let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-    let ne, na = (cond m1 i (cond m2 j f)), (mcond [i, m1; j, m2] f)
+    let ne, na = (cond m1 i (cond m2 j f)), (mcond [i, m1, None; j, m2, None] f)
+    let input = [|
+      for i1 in 0 .. m1 - 1 -> i1 = i
+      for j1 in 0 .. m2 - 1 -> j1 = j
+      yield! toBools a
+    |]
+    let expected = eval' ne input
+    let actual = eval' na input
+    $"({i} {j} {numberValue a}) --> {expected} = {actual}" @| (expected = actual)
+
+  [<Property>]
+  let ``mcond: double cond with permutation``(Size i, Size j, Num1 a) =
+    let n = modValue a
+    let m1, m2 = 4, 6
+    let i, j = i % m1, j % m2
+    let f = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
+    let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let f = f >>> g
+    let m = f.Inputs.Length
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let g1, g2 = rotate 4 2, (reverse 6 >>> rotate 6 3)
+    let ne = (cond m1 i (cond m2 j f >>> (g2 &&& identity m)) >>> (g1 &&& identity (m2 + m)))
+    let na = (mcond [i, m1, Some g1; j, m2, Some g2] f)
     let input = [|
       for i1 in 0 .. m1 - 1 -> i1 = i
       for j1 in 0 .. m2 - 1 -> j1 = j
@@ -637,7 +659,7 @@ module ReversibleNetworkArithCondTests =
     let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
     let f = f >>> g
     let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-    let ne, na = (cond m1 i (cond m2 j (cond m3 k f))), (mcond [i, m1; j, m2; k, m3] f)
+    let ne, na = (cond m1 i (cond m2 j (cond m3 k f))), (mcond [i, m1, None; j, m2, None; k, m3, None] f)
     let input = [|
       for i1 in 0 .. m1 - 1 -> i1 = i
       for j1 in 0 .. m2 - 1 -> j1 = j
@@ -656,7 +678,30 @@ module ReversibleNetworkArithCondTests =
     let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
     let f = f >>> g
     let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-    let ne, na = (cond 2 i (cond 2 j (cond 2 k (cond 2 l f)))), (mcond [i, 2; j, 2; k, 2; l, 2] f)
+    let ne, na = (cond 2 i (cond 2 j (cond 2 k (cond 2 l f)))), (mcond [i, 2, None; j, 2, None; k, 2, None; l, 2, None] f)
+    let input = [|
+      for i1 in 0 .. 1 -> i1 = i
+      for j1 in 0 .. 1 -> j1 = j
+      for k1 in 0 .. 1 -> k1 = k
+      for l1 in 0 .. 1 -> l1 = l
+      yield! toBools a
+    |]
+    let expected = eval' ne input
+    let actual = eval' na input
+    true ==> ($"({i} {j} {numberValue a}) --> {expected} = {actual}" @| (expected = actual))
+
+  [<Property>]
+  let ``mcond: 4x bool mixed``(i, j, k, l, Num1 a) =
+    let n = modValue a
+    let i, j, k, l = (if i then 1 else 0), (if j then 1 else 0), (if k then 1 else 0), (if l then 1 else 0)
+    let f = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst 17 |> bIsoToNetwork
+    let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let f = f >>> g
+    let m = f.Inputs.Length
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let neg = comm 1 1
+    let ne = cond 2 i (cond 2 j (cond 2 k (cond 2 l f >>> (neg &&& identity m))) >>> (neg &&& identity (m + 4)))
+    let na = mcond [i, 2, None; j, 2, Some neg; k, 2, None; l, 2, Some neg] f
     let input = [|
       for i1 in 0 .. 1 -> i1 = i
       for j1 in 0 .. 1 -> j1 = j

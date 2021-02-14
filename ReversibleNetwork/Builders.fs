@@ -176,25 +176,18 @@ let buffer n =
   { Vertices = vs; Edges = Map.empty; Gates = Set.singleton s
     Inputs = List.ofArray inputs; Outputs = List.ofArray outputs }
 
-let extract (i0, n) =
-  let inputs = Array.init n (fun i -> [$"bi{i}"; rs()])
-  let outputs = Array.init n (fun i -> [$"bo{i}"; rs()])
-  let vs = Seq.append inputs outputs |> Set.ofSeq
-  let edges =
-    seq {
-      for i in 0 .. n do
-        if i <> i0 then yield inputs.[i], outputs.[i]
-    }
-    |> Map.ofSeq
-  { Vertices = vs; Edges = edges; Gates = Set.empty
-    Inputs = List.ofArray inputs; Outputs = List.ofArray outputs }, (inputs.[i0], outputs.[i0])
-
 module Operators =
   let inline (~~) a = inverse a
   let inline (>>>) f g = compose f g
   let inline (&&&) a b = stack a b
 
 open Operators
+
+let cond1 f =
+  let m = f.Inputs.Length
+  if m <> f.Outputs.Length then
+    invalidArg (nameof f) "cond: mismatch arity"
+  multiplex m >>> (identity 1 &&& f &&& identity m) >>> demultiplex m
 
 let moveToLast n i = identity i &&& comm 1 (n - i - 1)
 let symMoveToLast n i = identity i &&& comm (n - i - 1) 1
@@ -208,35 +201,48 @@ let cond n i (f : Network) =
 
   let pre = moveToLast n i &&& identity m
   let post = symMoveToLast n i &&& identity m
-  let body = multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
+  let body = cond1 f
   pre >>> (identity (n - 1) &&& body) >>> post
 
 let mcond conds (f : Network) =
+  let m = f.Inputs.Length
+  let getN (_, n, _) = n
+  let getPost n0 g0 h0 h =
+    match g0 with
+    | None -> h0 (identity n0)
+    | Some (g0 : Network) -> 
+      if g0.Inputs.Length <> n0 then
+        invalidArg (nameof conds) $"non-conformable postfix compose: expected {n0} but got {g0.Inputs.Length}"
+      h g0
+
   match conds with
   | [] -> invalidArg (nameof conds) "mcond: no conditions"
-  | [i, n] -> cond n i f
-  | (i0, n0) :: xs ->
-    let m = f.Inputs.Length
+  | [i, n, g] -> 
+    let g' = (Option.defaultWith (fun _ -> identity n) g) &&& identity m
+    cond n i f >>> g'
+  | (i0, n0, g0) :: xs ->
     if m <> f.Outputs.Length then
       invalidArg (nameof f) "mcond: mismatch arity"
 
     let rec cmcond conds =
       match conds with
-      | [] -> multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
-      | (i0, n0) :: xs ->
-        let nr = m + List.sumBy snd xs
+      | [] -> cond1 f
+      | (i0, n0, g0) :: xs ->
+        let nr = m + List.sumBy getN xs
         let ciToLast = (identity 1 &&& moveToLast n0 i0) >>> comm 1 n0 >>> (identity (n0 - 1) &&& comm 1 1)
         let rmpx = multiplex 1 >>> (identity 1 &&& comm 1 1)
         let mPart = identity (n0 - 1) &&& rmpx
         let prefix = ((ciToLast >>> mPart) &&& identity nr)
         let postfix = ~~prefix
-        prefix >>> (identity (n0 + 1) &&& cmcond xs) >>> postfix
+        let g0' = getPost n0 g0 (fun idn0 -> identity 1 &&& idn0) cond1 &&& identity nr
+        prefix >>> (identity (n0 + 1) &&& cmcond xs) >>> postfix >>> g0'
 
-    let nr = m + List.sumBy snd xs
+    let nr = m + List.sumBy getN xs
     let prefix = moveToLast n0 i0 &&& identity nr
     let postfix = symMoveToLast n0 i0 &&& identity nr
     let mid = identity (n0 - 1) &&& cmcond xs
-    prefix >>> mid >>> postfix
+    let g0' = getPost n0 g0 id id &&& identity nr
+    prefix >>> mid >>> postfix >>> g0'
 
 let rec repeat i (f : Network) =
   let m = f.Inputs.Length
