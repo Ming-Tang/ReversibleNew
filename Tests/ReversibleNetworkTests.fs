@@ -11,7 +11,10 @@ type ComposedNetwork = ComposedNetwork of Network
 type SymmetricComposedNetwork = SCN of Network
 type SymmetricComposedNetworkPair = SCNPair of Network * Network
 type BoolArray = BoolArray of bool[]
+/// A Size: positive integer
 type Size = Size of int
+/// Two difference sizes
+type SizeD = SizeD of int * int
 
 let genPerm n =
   gen {
@@ -120,6 +123,17 @@ type Generators() =
     Gen.sized (fun n ->
       Gen.choose (1, max 1 <| min 10 n)
       |> Gen.map Size
+    )
+    |> Arb.fromGen
+
+  static member SizeD() =
+    Gen.sized (fun n ->
+      gen {
+        let! a = Gen.choose (1, max 2 <| min 10 n)
+        let! b = Gen.choose (1, max 2 <| min 10 n)
+        return SizeD(a, b)
+      }
+      |> Gen.filter (fun (SizeD(a, b)) -> a <> b)
     )
     |> Arb.fromGen
 
@@ -342,9 +356,7 @@ module ReversibleNetworkMultiplexTests =
 
 [<AutoOpen>]
 module Helpers =
-  open ReversibleArithTests
   open ReversibleArith.Iso
-  open ReversibleArith.NumIso
 
   let bIsoToNetwork biso =
     biso |> getSymIso |> FromIso.fromSymIso Network.simplify |> Network.canonicalize
@@ -366,10 +378,12 @@ module Helpers =
     let res = Simulator.evaluate n arr
     intPairFromBools (s, s') res
 
-[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
+  let eval' n arr =
+    Simulator.evaluate (Network.canonicalize n) arr
+
+[<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 200)>]
 module ReversibleNetworkArithCondTests =
   open ReversibleArithTests
-  open ReversibleArith.Iso
   open ReversibleArith.NumIso
 
   [<Property>]
@@ -545,67 +559,114 @@ module ReversibleNetworkArithCondTests =
     (cond n i f >>> cond n k id >>> cond n j g), (cond n j g >>> cond n k id >>> cond n i f)
 
   [<Property>]
-  let ``cond: compose property (different, intermediate identity)``(Num0 a, Num0 b, Size i, Size j, Size k) =
+  let ``cond: compose property (different, intermediate identity)``(Num0 a, Num0 b, SizeD(i, j), Size k) =
     let n = List.sum (getBases a)
     let i, j, k = i % n, j % n, k % n
-    if i = j then
-      false ==> false
-    else
-      let ne, na = memoized2 ("makeCC3", (n, i, j, k)) makeCC3 
-      let expected = eval2 ne IsoTests.succNum0 (a, b)
-      let actual = eval2 na IsoTests.succNum0 (a, b)
-      true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
+    let ne, na = memoized2 ("makeCC3", (n, i, j, k)) makeCC3 
+    let expected = eval2 ne IsoTests.succNum0 (a, b)
+    let actual = eval2 na IsoTests.succNum0 (a, b)
+    $"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual)
 
   [<Property>]
-  let ``cond: compose property (double eval)``(Num0 a, Num0 b, Size i, Size j) =
+  let ``cond: compose property (double eval)``(Num0 a, Num0 b, SizeD (i, j)) =
     let n = modValue a
     let i, j = i % n, j % n
-    if i = j then
-      false ==> false
-    else
-      let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 3 |> bIsoToNetwork
-      let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Neg |> bIsoToNetwork
-      let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-      let lhs = cond n i f
-      let rhs = cond n j g
-      let expected = eval2 (lhs >>> rhs) IsoTests.succNum0 (a, b)
-      let actual = 
-        let x, y = eval2 rhs IsoTests.succNum0 (a, b)
-        let x, y = Digit(x, B10), Digit(y, B10)
-        eval2 lhs IsoTests.succNum0 (x, y)
+    let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 3 |> bIsoToNetwork
+    let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Neg |> bIsoToNetwork
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let lhs = cond n i f
+    let rhs = cond n j g
+    let expected = eval2 (lhs >>> rhs) IsoTests.succNum0 (a, b)
+    let actual = 
+      let x, y = eval2 rhs IsoTests.succNum0 (a, b)
+      let x, y = Digit(x, B10), Digit(y, B10)
+      eval2 lhs IsoTests.succNum0 (x, y)
 
-      true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
+    $"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual)
 
   [<Property>]
-  let ``cond: compose property (bool controlled, different)``(Bool a, Num0 b, Size i, Size j) =
-    let n = modValue a
-    let i, j = i % n, j % n
-    if i = j then
-      false ==> false
-    else
-      let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
-      let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
-      let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-      let ne, na = (cond n i f >>> cond n j g), (cond n j g >>> cond n i f)
-      let expected = eval2' ne (IsoTests.succBool, IsoTests.succNum0) (a, b)
-      let actual = eval2' na (IsoTests.succBool, IsoTests.succNum0) (a, b)
-      true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
+  let ``cond: compose property (bool controlled, different)``(Bool a, Num0 b, p) =
+    let n = 2
+    let i, j = if p then 1, 0 else 0, 1
+    let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
+    let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let ne, na = (cond n i f >>> cond n j g), (cond n j g >>> cond n i f)
+    let expected = eval2' ne (IsoTests.succBool, IsoTests.succNum0) (a, b)
+    let actual = eval2' na (IsoTests.succBool, IsoTests.succNum0) (a, b)
+    $"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual)
 
   [<Property>]
-  let ``cond: compose property (bool controlled, feedback)``(Bool a, Num0 b, Size i, Size j) =
+  let ``cond: compose property (bool controlled, feedback)``(Bool a, Num0 b, p) =
+    let n = 2
+    let i, j = if p then 1, 0 else 0, 1
+    let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
+    let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let ne = (cond n i f >>> cond n j g)
+    let ni = ne >>> ~~ne
+    let expected = (numberValue a, numberValue b)
+    let actual = eval2' ni (IsoTests.succBool, IsoTests.succNum0) (a, b)
+    $"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual)
+
+  [<Property>]
+  let ``mcond: double cond``(Size i, Size j, Num1 a) =
     let n = modValue a
-    let i, j = i % n, j % n
-    if i = j then
-      false ==> false
-    else
-      let f = (IsoTests.succNum0 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
-      let g = (IsoTests.succNum0 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
-      let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
-      let ne = (cond n i f >>> cond n j g)
-      let ni = ne >>> ~~ne
-      let expected = (numberValue a, numberValue b)
-      let actual = eval2' ni (IsoTests.succBool, IsoTests.succNum0) (a, b)
-      true ==> ($"({numberValue a}, {numberValue b}) --> {expected} = {actual}" @| (expected = actual))
+    let m1, m2 = 4, 6
+    let i, j = i % m1, j % m2
+    let f = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst 4 |> bIsoToNetwork
+    let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let f = f >>> g
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let ne, na = (cond m1 i (cond m2 j f)), (mcond [i, m1; j, m2] f)
+    let input = [|
+      for i1 in 0 .. m1 - 1 -> i1 = i
+      for j1 in 0 .. m2 - 1 -> j1 = j
+      yield! toBools a
+    |]
+    let expected = eval' ne input
+    let actual = eval' na input
+    $"({i} {j} {numberValue a}) --> {expected} = {actual}" @| (expected = actual)
+
+  [<Property>]
+  let ``mcond: triple cond``(Size i, Size j, Size k, Num1 a) =
+    let n = modValue a
+    let m1, m2, m3 = 4, 6, 5
+    let i, j, k = i % m1, j % m2, k % m3
+    let f = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst 17 |> bIsoToNetwork
+    let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let f = f >>> g
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let ne, na = (cond m1 i (cond m2 j (cond m3 k f))), (mcond [i, m1; j, m2; k, m3] f)
+    let input = [|
+      for i1 in 0 .. m1 - 1 -> i1 = i
+      for j1 in 0 .. m2 - 1 -> j1 = j
+      for k1 in 0 .. m3 - 1 -> k1 = k
+      yield! toBools a
+    |]
+    let expected = eval' ne input
+    let actual = eval' na input
+    true ==> ($"({i} {j} {numberValue a}) --> {expected} = {actual}" @| (expected = actual))
+
+  [<Property>]
+  let ``mcond: 4x bool``(i, j, k, l, Num1 a) =
+    let n = modValue a
+    let i, j, k, l = (if i then 1 else 0), (if j then 1 else 0), (if k then 1 else 0), (if l then 1 else 0)
+    let f = (IsoTests.succNum1 :> ISuccAddBuilder<_>).PlusConst 17 |> bIsoToNetwork
+    let g = (IsoTests.succNum1 :> ISuccAddBuilder<_>).Compl |> bIsoToNetwork
+    let f = f >>> g
+    let cond, (>>>) = Builders.cond, Builders.Operators.(>>>)
+    let ne, na = (cond 2 i (cond 2 j (cond 2 k (cond 2 l f)))), (mcond [i, 2; j, 2; k, 2; l, 2] f)
+    let input = [|
+      for i1 in 0 .. 1 -> i1 = i
+      for j1 in 0 .. 1 -> j1 = j
+      for k1 in 0 .. 1 -> k1 = k
+      for l1 in 0 .. 1 -> l1 = l
+      yield! toBools a
+    |]
+    let expected = eval' ne input
+    let actual = eval' na input
+    true ==> ($"({i} {j} {numberValue a}) --> {expected} = {actual}" @| (expected = actual))
 
 [<Properties(Arbitrary = [| typeof<Generators>; typeof<ReversibleArithTests.Generators> |], MaxTest = 100)>]
 module ReversibleNetworkArithTests =

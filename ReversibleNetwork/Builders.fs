@@ -176,12 +176,28 @@ let buffer n =
   { Vertices = vs; Edges = Map.empty; Gates = Set.singleton s
     Inputs = List.ofArray inputs; Outputs = List.ofArray outputs }
 
+let extract (i0, n) =
+  let inputs = Array.init n (fun i -> [$"bi{i}"; rs()])
+  let outputs = Array.init n (fun i -> [$"bo{i}"; rs()])
+  let vs = Seq.append inputs outputs |> Set.ofSeq
+  let edges =
+    seq {
+      for i in 0 .. n do
+        if i <> i0 then yield inputs.[i], outputs.[i]
+    }
+    |> Map.ofSeq
+  { Vertices = vs; Edges = edges; Gates = Set.empty
+    Inputs = List.ofArray inputs; Outputs = List.ofArray outputs }, (inputs.[i0], outputs.[i0])
+
 module Operators =
   let inline (~~) a = inverse a
   let inline (>>>) f g = compose f g
   let inline (&&&) a b = stack a b
 
 open Operators
+
+let moveToLast n i = identity i &&& comm 1 (n - i - 1)
+let symMoveToLast n i = identity i &&& comm (n - i - 1) 1
 let cond n i (f : Network) = 
   let m = f.Inputs.Length
   if m <> f.Outputs.Length then
@@ -190,10 +206,37 @@ let cond n i (f : Network) =
   if i >= n || i < 0 then
     invalidArg (nameof i) "cond: out of range"
 
-  let pre = identity i &&& comm 1 (n - i - 1) &&& identity m
-  let post = identity i &&& comm (n - i - 1) 1 &&& identity m
+  let pre = moveToLast n i &&& identity m
+  let post = symMoveToLast n i &&& identity m
   let body = multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
   pre >>> (identity (n - 1) &&& body) >>> post
+
+let mcond conds (f : Network) =
+  match conds with
+  | [] -> invalidArg (nameof conds) "mcond: no conditions"
+  | [i, n] -> cond n i f
+  | (i0, n0) :: xs ->
+    let m = f.Inputs.Length
+    if m <> f.Outputs.Length then
+      invalidArg (nameof f) "mcond: mismatch arity"
+
+    let rec cmcond conds =
+      match conds with
+      | [] -> multiplex m >>> (identity 1 &&& (f &&& identity m)) >>> demultiplex m
+      | (i0, n0) :: xs ->
+        let nr = m + List.sumBy snd xs
+        let ciToLast = (identity 1 &&& moveToLast n0 i0) >>> comm 1 n0 >>> (identity (n0 - 1) &&& comm 1 1)
+        let rmpx = multiplex 1 >>> (identity 1 &&& comm 1 1)
+        let mPart = identity (n0 - 1) &&& rmpx
+        let prefix = ((ciToLast >>> mPart) &&& identity nr)
+        let postfix = ~~prefix
+        prefix >>> (identity (n0 + 1) &&& cmcond xs) >>> postfix
+
+    let nr = m + List.sumBy snd xs
+    let prefix = moveToLast n0 i0 &&& identity nr
+    let postfix = symMoveToLast n0 i0 &&& identity nr
+    let mid = identity (n0 - 1) &&& cmcond xs
+    prefix >>> mid >>> postfix
 
 let rec repeat i (f : Network) =
   let m = f.Inputs.Length
@@ -214,4 +257,3 @@ let condRepeat n f =
       cond n i (repeat i f)
   }
   |> Seq.reduce (>>>)
-

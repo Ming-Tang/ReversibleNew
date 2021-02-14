@@ -78,8 +78,16 @@ let bIsoToNetwork biso =
 [<EntryPoint>]
 let main argv =
 #if X || !X
+  let n = Builders.mcond [3, 10; 7, 10] (Builders.buffer 5) |> Network.canonicalize
+  // let n = Builders.cond 10 3 (Builders.cond 10 7 <| Builders.buffer 5) |> Network.canonicalize
+  let t = exportGraphviz n |> Async.StartAsTask
+  t.Wait()
+  0
+#else
+#if X || !X
+  
   printfn "n, sG, sV, aG, aV, mG, mV"
-  for n in 1 .. 16 do
+  for n in 1 .. 32 do
     let xs = Array.init n (fun _ -> 2) |> List.ofArray
     let s = succFromList xs
     let arr =
@@ -98,9 +106,9 @@ let main argv =
 
 #else
 
-  let s = succNum B2 (succNum B2 (succDigit B2)) :> ISuccAddBuilder<_>
-  // let s = succNum B2 (succNum B2 (succNum B2 (succDigit B2)))
-  // let s = succNum B5 (succNum B4 (succNum B4 (succDigit B6)))
+  let s = succNum B2 (succNum B2 (succNum B2 (succDigit B2))) :> ISuccAddBuilder<_>
+  // let s = (succNum B10 (succDigit B10)) :> ISuccAddBuilder<_>
+  // let s = succNum B4 (succDigit B6) :> ISuccAddBuilder<_>
 
   // let plusConst = 35
   // let pc = s.PlusConst plusConst
@@ -108,14 +116,19 @@ let main argv =
   // let iso = ReversibleArith.Iso.Operators.(>>>) pc neg
 
   //let add = s.AddMultiple 3
+  let succ = s.Succ
   let add = s.Add
+  let nSucc = bIsoToNetwork succ
   let nAdd = bIsoToNetwork add
-  runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
-  let t = exportGraphviz nAdd |> Async.StartAsTask
-  exportSymIso add
+  
+  runNetwork s nSucc (fun a -> $"{a} + 1")
+  // runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
+  let t = exportGraphviz nSucc |> Async.StartAsTask
+  exportSymIso succ
   t.Wait()
   printfn "-"
 
   0
 #endif
 
+#endif
