@@ -218,11 +218,15 @@ let mcond conds (f : Network) =
   match conds with
   | [] -> invalidArg (nameof conds) "mcond: no conditions"
   | [i, n, g] -> 
+    if i >= n then
+      invalidArg (nameof conds) "mcond: i >= n"
     let g' = (Option.defaultWith (fun _ -> identity n) g) &&& identity m
     cond n i f >>> g'
   | (i0, n0, g0) :: xs ->
     if m <> f.Outputs.Length then
       invalidArg (nameof f) "mcond: mismatch arity"
+    if i0 >= n0 then
+      invalidArg (nameof conds) "mcond: i >= n"
 
     let rec cmcond conds =
       match conds with

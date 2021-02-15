@@ -52,7 +52,7 @@ let runNetwork (s : #ISuccAddBuilder<_>) n formatExpr =
     printfn $"{formatExpr a} = {b} (mod {m})"
 
 let exportSymIso iso =
-  let s = symIsoToLaTeX None (getSymIso iso)
+  let s = symIsoToLaTeX None (FromIso.preSimplify <| getSymIso iso)
   File.WriteAllText("Output.md", $"\n$${s}$$\n")
 
 let exportGraphviz n =
@@ -78,35 +78,31 @@ let bIsoToNetwork biso =
 [<EntryPoint>]
 let main argv =
 #if X && !X
-  let n = Builders.mcond [3, 10; 7, 10] (Builders.buffer 5) |> Network.canonicalize
-  // let n = Builders.cond 10 3 (Builders.cond 10 7 <| Builders.buffer 5) |> Network.canonicalize
-  let t = exportGraphviz n |> Async.StartAsTask
-  t.Wait()
-  0
-#else
-#if X || !X
   
-  printfn "n, sG, sV, aG, aV, mG, mV"
-  for n in 1 .. 32 do
-    let xs = Array.init n (fun _ -> 2) |> List.ofArray
-    let s = succFromList xs
-    let arr =
-      [|
-        async { return bIsoToNetwork s.Succ' }
-        async { return bIsoToNetwork s.Add' }
-        async { return bIsoToNetwork s.Mult' }
-      |]
-      |> Async.Parallel
-      |> Async.RunSynchronously
-    let succ, add, mult = arr.[0], arr.[1], arr.[2]
-    printfn $"{n}, {succ.Gates.Count}, {succ.Vertices.Count}, {add.Gates.Count}, {add.Vertices.Count}, {mult.Gates.Count}, {mult.Vertices.Count}"
-    ()
-   
+  printfn "n, w, sG, sV, aG, aV, mG, mV"
+  for w in 1 .. 4 do
+    for n in 1 .. 15 do
+      if n % w = 0 then
+        let xs = Array.init (n / w) (fun _ -> 2 * w) |> List.ofArray
+        let s = succFromList xs
+        let arr =
+          [|
+            async { return bIsoToNetwork s.Succ' }
+            async { return bIsoToNetwork s.Add' }
+            async { return bIsoToNetwork s.Mult' }
+          |]
+          |> Async.Parallel
+          |> Async.RunSynchronously
+        let succ, add, mult = arr.[0], arr.[1], arr.[2]
+        printfn $"{n}, {w}, {succ.Gates.Count}, {succ.Vertices.Count}, {add.Gates.Count}, {add.Vertices.Count}, {mult.Gates.Count}, {mult.Vertices.Count}"
+        ()
+     
   0
 
 #else
 
-  let s = succNum B2 (succNum B2 (succNum B2 (succDigit B2))) :> ISuccAddBuilder<_>
+  let s = succNum B2 (succNum B2 (succNum B2 (succNum B2 (succDigit B2)))) :> ISuccAddBuilder<_>
+  // let s = succNum B2 (succNum B2 (succNum B2 (succNum B2 (succNum B2 (succDigit B2))))) :> ISuccAddBuilder<_>
   // let s = (succNum B10 (succDigit B10)) :> ISuccAddBuilder<_>
   // let s = succNum B4 (succDigit B6) :> ISuccAddBuilder<_>
 
@@ -117,18 +113,17 @@ let main argv =
 
   //let add = s.AddMultiple 3
   let succ = s.Succ
-  let add = s.Add
+  let add = s.AddMultiple 1
   let nSucc = bIsoToNetwork succ
   let nAdd = bIsoToNetwork add
   
-  runNetwork s nSucc (fun a -> $"{a} + 1")
-  // runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
-  let t = exportGraphviz nSucc |> Async.StartAsTask
-  exportSymIso succ
+  // runNetwork s nSucc (fun a -> $"{a} + 1")
+  runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
+  let t = exportGraphviz nAdd |> Async.StartAsTask
+  exportSymIso add
   t.Wait()
   printfn "-"
 
   0
 #endif
 
-#endif

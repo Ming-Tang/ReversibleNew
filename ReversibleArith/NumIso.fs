@@ -194,7 +194,8 @@ module Builders =
       member s.Succ = 
         let (SuccNum (b, s')) = s
         let num = num (s :> ISuccAddBuilder<_>)
-        (sym num >>> (succ b &&& id) >>> (cond (Digit(0, b)) s'.Succ) >>> num)
+        // (sym num >>> (succ b &&& id) >>> (cond (Digit(0, b)) s'.Succ) >>> num)
+        (sym num >>> (condLast b s'.Succ) >>> (succ b &&& id) >>> num)
         |> group (sprintf "succ(%s)" <| basesName s)
 
       member s.SuccRest n =
@@ -215,8 +216,8 @@ module Builders =
         let (Bases b1, Bases b2) = (s, s')
         let succ = (s :> ISuccAddBuilder<_>).Succ
         let splitDigits = group $"{name}.sD" (assoc >>> (id &&& (sym assoc >>> (comm &&& id) >>> assoc)) >>> sym assoc)
-        let joinA = group $"{name}.jA" ((id &&& (sym assoc >>> (num &&& id))) >>> sym assoc)
-        let addB = group $"{name}.aB" ((rep b succ >>> comm) &&& id)
+        let joinA = (id &&& (sym assoc >>> (num &&& id))) >>> sym assoc
+        let addB = (rep b succ >>> comm) &&& id
         let join = group $"{name}.j" (assoc >>> joinA >>> addB >>> assoc)
         ((sym num &&& sym num) >>> splitDigits >>> (comm &&& s'.Add) >>> join >>> (id &&& num))
         |> group name
