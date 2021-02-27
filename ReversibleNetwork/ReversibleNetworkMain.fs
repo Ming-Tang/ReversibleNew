@@ -52,7 +52,7 @@ let runNetwork (s : #ISuccAddBuilder<_>) n formatExpr =
     printfn $"{formatExpr a} = {b} (mod {m})"
 
 let exportSymIso iso =
-  let s = symIsoToLaTeX None (FromIso.preSimplify <| getSymIso iso)
+  let s = symIsoToLaTeX None (iso |> getSymIso |> FromIso.repeatPreSimplify)
   File.WriteAllText("Output.md", $"\n$${s}$$\n")
 
 let exportGraphviz n =
@@ -77,9 +77,9 @@ let bIsoToNetwork biso =
 
 [<EntryPoint>]
 let main argv =
-#if X && !X
+#if X || !X
   
-  printfn "n, w, sG, sV, aG, aV, mG, mV"
+  printfn "%s" <| String.concat ",\t" ["n"; "w"; "sG"; "sV"; "aG"; "aV"; "mG"; "mV"]
   for w in 1 .. 4 do
     for n in 1 .. 15 do
       if n % w = 0 then
@@ -94,7 +94,7 @@ let main argv =
           |> Async.Parallel
           |> Async.RunSynchronously
         let succ, add, mult = arr.[0], arr.[1], arr.[2]
-        printfn $"{n}, {w}, {succ.Gates.Count}, {succ.Vertices.Count}, {add.Gates.Count}, {add.Vertices.Count}, {mult.Gates.Count}, {mult.Vertices.Count}"
+        printfn $"{n},\t{w},\t{succ.Gates.Count},\t{succ.Vertices.Count},\t{add.Gates.Count},\t{add.Vertices.Count}, {mult.Gates.Count},\t{mult.Vertices.Count}"
         ()
      
   0
@@ -111,15 +111,14 @@ let main argv =
   // let neg = s.Neg
   // let iso = ReversibleArith.Iso.Operators.(>>>) pc neg
 
-  //let add = s.AddMultiple 3
   let succ = s.Succ
   let add = s.AddMultiple 1
   let nSucc = bIsoToNetwork succ
   let nAdd = bIsoToNetwork add
+  let t = exportGraphviz nAdd |> Async.StartAsTask
   
   // runNetwork s nSucc (fun a -> $"{a} + 1")
   runNetwork2 s nAdd (fun a b -> $"{a} + {b}") (fun a b -> $"{a}")
-  let t = exportGraphviz nAdd |> Async.StartAsTask
   exportSymIso add
   t.Wait()
   printfn "-"

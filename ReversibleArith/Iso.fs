@@ -3,21 +3,22 @@ open System.Text.RegularExpressions
 
 module Widths =
   open System
-  open System.Collections.Generic
+  open System.Collections.Concurrent
 
-  let widths : Dictionary<Type, int> = Dictionary()
+  let widths : ConcurrentDictionary<Type, int> = ConcurrentDictionary()
   let add t i = widths.[t] <- i
   let rec get (t : Type) = 
     if widths.ContainsKey(t) then
       Some widths.[t]
-    elif t.IsGenericType && (t.GetGenericTypeDefinition() = typedefof<unit * unit> || t.Name = "SuccNum`2" || t.Name = "Num`2") then
-        match t.GetGenericArguments() with
-        | [| a; b |] -> Option.map2 (+) (get a) (get b)
-        | _ -> None
+    elif t.IsGenericType && (t.GetGenericTypeDefinition() = typedefof<unit * unit> 
+                             || t.Name = "SuccNum`2" || t.Name = "Num`2") then
+      match t.GetGenericArguments() with
+      | [| a; b |] -> Option.map2 (+) (get a) (get b)
+      | _ -> None
     elif t.IsGenericType && t.Name = "Digit`1" then
-        match t.GetGenericArguments() with
-        | [| a |] -> get a
-        | _ -> None
+      match t.GetGenericArguments() with
+      | [| a |] -> get a
+      | _ -> None
     else
       None
 
@@ -68,8 +69,8 @@ let funcNameLaTeX' =
     Seq.map string bs
     |> String.concat ", "
     |> sprintf "N_{%s}"
+  | FSucc b | FAddDigit(1, b) -> sprintf "S_{%d}" b
   | FAddDigit(i, b) -> sprintf "A(%d)_{%d}" i b
-  | FSucc b -> sprintf "S_{%d}" b
   | FComm None -> "C"
   | FComm (Some(a, b)) -> sprintf "C_{%d,%d}" a b
   | FAssoc None -> "A"

@@ -107,6 +107,8 @@ module Builders =
       member b.AddMultiple k =
         if k < 0 then
           sym <| b.Fold(-k, fun (Base _b) s -> (s * _b, b.PlusConst(s)))
+        elif k = 1 then
+          b.Add
         else
           b.Fold(k, fun (Base _b) s -> (s * _b, b.PlusConst(s)))
         |> group (sprintf "addMultiple(%d; %s)" k <| basesName b)
@@ -240,15 +242,21 @@ module Builders =
         |> group (sprintf "compl(%s)" <| basesName s)
 
       member s.PlusConst c =
-        let (SuccNum ((Base b' as b), s')) = s
-        let s = s :> ISuccAddBuilder<_>
-        if c < 0 then
-          sym (s.PlusConst(-c))
+        if c = 0 then
+          id
+        elif c = 1 then
+          let s = s :> ISuccAddBuilder<_>
+          s.Succ
         else
-          let d, q = ((c % b') + b') % b', c / b'
-          let num, succ = num s, s.Succ
-          (repConst d succ >>> sym num >>> (id &&& s'.PlusConst q) >>> num)
-          |> group (sprintf "plusConst(%d; %s)" c <| basesName s)
+          let (SuccNum ((Base b' as b), s')) = s
+          let s = s :> ISuccAddBuilder<_>
+          if c < 0 then
+            sym (s.PlusConst(-c))
+          else
+            let d, q = ((c % b') + b') % b', c / b'
+            let num, succ = num s, s.Succ
+            (repConst d succ >>> sym num >>> (id &&& s'.PlusConst q) >>> num)
+            |> group (sprintf "plusConst(%d; %s)" c <| basesName s)
 
       member s.NumFromList xs =
         let (SuccNum (b, s')) = s
